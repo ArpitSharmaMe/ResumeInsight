@@ -16,13 +16,13 @@ from pdfminer3.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer3.converter import TextConverter
 
 # OCR fallback
-try:
-    import pytesseract
-    from PIL import Image as PILImage
-    from pdf2image import convert_from_path
-    OCR_AVAILABLE = True
-except:
-    OCR_AVAILABLE = False
+#try:
+ #   import pytesseract
+  #  from PIL import Image as PILImage
+   # from pdf2image import convert_from_path
+    #OCR_AVAILABLE = True
+#except:
+ #   OCR_AVAILABLE = False
 
 from pyresparser import ResumeParser
 from streamlit_tags import st_tags
@@ -1689,4 +1689,5 @@ def run():
         run_career_analytics()
 
 if __name__ == "__main__":
+
     run()
