@@ -765,21 +765,32 @@ def interview_question_generator():
             num_questions = st.slider("Number of Questions", 5, 25, 15)
             difficulty = st.select_slider("Difficulty Level", options=["Easy", "Medium", "Hard", "Mixed"])
         
-        skills = st_tags(
-            label='Your Key Skills*',
-            text='Press enter after each skill',
-            suggestions=['Python', 'JavaScript', 'React', 'AWS', 'SQL', 'Machine Learning', 'Team Leadership', 'Project Management'],
-            key='interview_skills'
-        )
+        # Use text input for skills instead of st_tags for better reliability
+        skills_input = st.text_input("Your Key Skills* (comma separated)", 
+                                   placeholder="e.g., Python, JavaScript, React, AWS, SQL")
         
         specific_technologies = st.text_input("Specific Technologies/Tools", placeholder="e.g., React, TensorFlow, AWS, Docker")
         
-        if st.form_submit_button("🎯 Generate Interview Questions"):
-            if job_role and skills and question_types:
+        submitted = st.form_submit_button("🎯 Generate Interview Questions")
+        
+        if submitted:
+            # Process skills from text input
+            skills = [skill.strip() for skill in skills_input.split(',')] if skills_input else []
+            
+            # Validation
+            missing_fields = []
+            if not job_role:
+                missing_fields.append("Job Role")
+            if not skills_input:
+                missing_fields.append("Key Skills")
+            if not question_types:
+                missing_fields.append("Question Types")
+            
+            if missing_fields:
+                st.error(f"❌ Please fill in all required fields: {', '.join(missing_fields)}")
+            else:
                 questions = generate_personalized_questions(job_role, experience_level, skills, question_types, difficulty, specific_technologies, num_questions)
                 display_questions(questions, job_role, experience_level)
-            else:
-                st.error("❌ Please fill in all required fields (marked with *)")
 
 def generate_personalized_questions(job_role, experience_level, skills, question_types, difficulty, specific_technologies, num_questions):
     """Generate personalized interview questions based on inputs"""
@@ -834,6 +845,26 @@ def generate_personalized_questions(job_role, experience_level, skills, question
         ]
         questions.extend([{'type': 'Problem Solving', 'question': q, 'difficulty': 'Medium'} for q in problem_questions])
     
+    # Cultural fit questions
+    if "Cultural Fit" in question_types:
+        cultural_questions = [
+            "What type of work environment do you thrive in?",
+            "How do you handle feedback and criticism?",
+            "What motivates you to do your best work?",
+            "Describe your ideal company culture"
+        ]
+        questions.extend([{'type': 'Cultural Fit', 'question': q, 'difficulty': 'Easy'} for q in cultural_questions])
+    
+    # Situational questions
+    if "Situational" in question_types:
+        situational_questions = [
+            "What would you do if you disagreed with your manager's technical decision?",
+            "How would you handle a situation where a project deadline was moved up unexpectedly?",
+            "What would you do if you discovered a critical bug in production?",
+            "How would you approach a situation where you had to learn a new technology quickly?"
+        ]
+        questions.extend([{'type': 'Situational', 'question': q, 'difficulty': 'Medium'} for q in situational_questions])
+    
     # Fill remaining slots with role-specific questions
     role_specific_questions = {
         'Data Scientist': [
@@ -853,6 +884,24 @@ def generate_personalized_questions(job_role, experience_level, skills, question
             "How do you approach code reviews?",
             "Describe your experience with testing methodologies",
             "What considerations do you make for security in your applications?"
+        ],
+        'Frontend Developer': [
+            "How do you ensure cross-browser compatibility?",
+            "What's your experience with modern JavaScript frameworks?",
+            "How do you optimize frontend performance?",
+            "Describe your approach to accessibility"
+        ],
+        'Backend Developer': [
+            "How do you design scalable APIs?",
+            "What's your experience with database optimization?",
+            "How do you handle authentication and authorization?",
+            "Describe your approach to API security"
+        ],
+        'Mobile Developer': [
+            "What's your experience with native vs cross-platform development?",
+            "How do you optimize mobile app performance?",
+            "Describe your approach to mobile UI/UX",
+            "How do you handle different screen sizes and orientations?"
         ]
     }
     
@@ -872,7 +921,7 @@ def generate_personalized_questions(job_role, experience_level, skills, question
 def display_questions(questions, job_role, experience_level):
     """Display generated questions in an organized way"""
     st.subheader(f"🎯 Personalized Interview Questions for {experience_level} {job_role}")
-    st.info(f"Generated {len(questions)} questions tailored to your profile")
+    st.success(f"Generated {len(questions)} questions tailored to your profile")
     
     # Categorize questions by type
     question_categories = {}
@@ -899,7 +948,7 @@ def display_questions(questions, job_role, experience_level):
                 with st.expander("💬 Practice Your Answer", expanded=False):
                     st.text_area(
                         f"Type your answer here...", 
-                        key=f"answer_{category}_{i}",
+                        key=f"answer_{category}_{i}_{random.randint(1000,9999)}",
                         height=100,
                         placeholder="Structure your answer using the STAR method:\n- Situation: Set the context\n- Task: What needed to be done\n- Action: What you specifically did\n- Result: The outcome and what you learned"
                     )
@@ -945,7 +994,19 @@ def display_questions(questions, job_role, experience_level):
         - Maintain positive body language
         - Send thank you notes within 24 hours
         """)
-
+    
+    # Download questions as text
+    questions_text = f"Interview Questions for {experience_level} {job_role}\n\n"
+    for category, category_questions in question_categories.items():
+        questions_text += f"{category}:\n"
+        for i, q in enumerate(category_questions, 1):
+            questions_text += f"{i}. {q['question']} ({q['difficulty']})\n"
+        questions_text += "\n"
+    
+    b64 = base64.b64encode(questions_text.encode()).decode()
+    href = f'<a href="data:file/txt;base64,{b64}" download="interview_questions_{job_role.replace(" ", "_")}.txt">📥 Download Questions as Text</a>'
+    st.markdown(href, unsafe_allow_html=True)
+    
 # -----------------------------
 # User Section
 # -----------------------------
@@ -1717,5 +1778,6 @@ def run():
 
 if __name__ == "__main__":
     run()
+
 
 
