@@ -1589,7 +1589,7 @@ def display_enhanced_admin_analytics():
         st.error(f"Error exporting data: {str(e)}")
 
 # -----------------------------
-# Resume Builder Functions
+# Resume Builder Functions - FIXED
 # -----------------------------
 def init_resume_builder_session():
     """Initialize resume builder session state"""
@@ -1649,21 +1649,26 @@ def render_resume_builder():
             height=100
         )
     
-    # Experience
+    # Experience - FIXED DATE FORMAT AND ADD FUNCTIONALITY
     with st.expander("💼 Work Experience"):
         st.subheader("Add Work Experience")
-        with st.form("experience_form"):
+        
+        # Use a form key to ensure form resets properly
+        with st.form("experience_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                company = st.text_input("Company*")
-                position = st.text_input("Position*")
+                company = st.text_input("Company*", key="exp_company")
+                position = st.text_input("Position*", key="exp_position")
             with col2:
-                start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="01/2020")
-                end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="12/2023 or Present")
+                # Fixed date format - use text input with better placeholder
+                start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="01/2020", key="exp_start")
+                end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="12/2023 or Present", key="exp_end")
             
-            description = st.text_area("Description*", height=100, placeholder="Describe your responsibilities and achievements...")
+            description = st.text_area("Description*", height=100, placeholder="Describe your responsibilities and achievements...", key="exp_desc")
             
-            if st.form_submit_button("Add Experience"):
+            submitted = st.form_submit_button("Add Experience")
+            
+            if submitted:
                 # Validation
                 errors = []
                 
@@ -1676,13 +1681,13 @@ def render_resume_builder():
                 if not description:
                     errors.append("Description is required")
                 
-                # Date validation
+                # Date validation - FIXED
                 if start_date and start_date.lower() != 'present':
                     if not validate_date_format(start_date):
                         errors.append("Start date must be in MM/YYYY format (e.g., 01/2020)")
                 
                 if end_date and end_date.lower() != 'present':
-                    if not validate_date_format(end_date):
+                    if not validate_date_format(end_date) and end_date.lower() != 'present':
                         errors.append("End date must be in MM/YYYY format (e.g., 12/2023) or 'Present'")
                 
                 # Date logic validation
@@ -1690,16 +1695,17 @@ def render_resume_builder():
                     start_date.lower() != 'present' and end_date.lower() != 'present' and
                     validate_date_format(start_date) and validate_date_format(end_date)):
                     
-                    start_dt = datetime.datetime.strptime(start_date, "%m/%Y")
-                    end_dt = datetime.datetime.strptime(end_date, "%m/%Y")
+                    start_month, start_year = map(int, start_date.split('/'))
+                    end_month, end_year = map(int, end_date.split('/'))
                     
-                    if end_dt < start_dt:
+                    if (end_year < start_year) or (end_year == start_year and end_month < start_month):
                         errors.append("End date cannot be before start date")
                 
                 if errors:
                     for error in errors:
                         st.error(f"❌ {error}")
                 else:
+                    # Add experience to session state
                     st.session_state.resume_data['experience'].append({
                         'company': company,
                         'position': position,
@@ -1708,6 +1714,7 @@ def render_resume_builder():
                         'description': description
                     })
                     st.success("✅ Experience added successfully!")
+                    st.rerun()  # Force rerun to update the display
         
         # Display experiences
         if st.session_state.resume_data['experience']:
@@ -1726,22 +1733,25 @@ def render_resume_builder():
         else:
             st.info("💡 Add your work experience to build a comprehensive resume")
     
-    # Education Section
+    # Education Section - FIXED DATE FORMAT
     with st.expander("🎓 Education"):
         st.subheader("Add Education")
-        with st.form("education_form"):
+        
+        with st.form("education_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
-                institution = st.text_input("Institution/University*")
-                degree = st.text_input("Degree/Certificate*")
+                institution = st.text_input("Institution/University*", key="edu_institution")
+                degree = st.text_input("Degree/Certificate*", key="edu_degree")
             with col2:
-                ed_start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="08/2018", key="ed_start")
-                ed_end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="05/2022", key="ed_end")
+                ed_start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="08/2018", key="edu_start")
+                ed_end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="05/2022", key="edu_end")
             
-            ed_description = st.text_area("Description/Achievements", height=100, key="ed_desc", 
+            ed_description = st.text_area("Description/Achievements", height=100, key="edu_desc", 
                                         placeholder="GPA, honors, relevant coursework, achievements...")
             
-            if st.form_submit_button("Add Education"):
+            submitted = st.form_submit_button("Add Education")
+            
+            if submitted:
                 # Validation
                 errors = []
                 
@@ -1752,13 +1762,13 @@ def render_resume_builder():
                 if not ed_start_date:
                     errors.append("Start date is required")
                 
-                # Date validation
+                # Date validation - FIXED
                 if ed_start_date and ed_start_date.lower() != 'present':
                     if not validate_date_format(ed_start_date):
                         errors.append("Start date must be in MM/YYYY format (e.g., 08/2018)")
                 
                 if ed_end_date and ed_end_date.lower() != 'present':
-                    if not validate_date_format(ed_end_date):
+                    if not validate_date_format(ed_end_date) and ed_end_date.lower() != 'present':
                         errors.append("End date must be in MM/YYYY format (e.g., 05/2022) or 'Present'")
                 
                 # Date logic validation
@@ -1766,10 +1776,10 @@ def render_resume_builder():
                     ed_start_date.lower() != 'present' and ed_end_date.lower() != 'present' and
                     validate_date_format(ed_start_date) and validate_date_format(ed_end_date)):
                     
-                    start_dt = datetime.datetime.strptime(ed_start_date, "%m/%Y")
-                    end_dt = datetime.datetime.strptime(ed_end_date, "%m/%Y")
+                    start_month, start_year = map(int, ed_start_date.split('/'))
+                    end_month, end_year = map(int, ed_end_date.split('/'))
                     
-                    if end_dt < start_dt:
+                    if (end_year < start_year) or (end_year == start_year and end_month < start_month):
                         errors.append("End date cannot be before start date")
                 
                 if errors:
@@ -1784,6 +1794,7 @@ def render_resume_builder():
                         'description': ed_description
                     })
                     st.success("✅ Education added successfully!")
+                    st.rerun()
         
         # Display education entries
         if st.session_state.resume_data['education']:
@@ -1819,9 +1830,9 @@ def render_resume_builder():
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            new_skill = st.text_input("Add Skill", placeholder="Enter a skill or select from suggestions")
+            new_skill = st.text_input("Add Skill", placeholder="Enter a skill or select from suggestions", key="new_skill_input")
         with col2:
-            add_skill_btn = st.button("Add Skill", use_container_width=True)
+            add_skill_btn = st.button("Add Skill", use_container_width=True, key="add_skill_btn")
         
         # Quick suggestions
         st.write("Quick add:")
@@ -1860,14 +1871,16 @@ def render_resume_builder():
     # Projects Section
     with st.expander("🚀 Projects"):
         st.subheader("Add Projects")
-        with st.form("project_form"):
-            project_name = st.text_input("Project Name*")
-            project_technologies = st.text_input("Technologies Used*", placeholder="Python, React, MongoDB, etc.")
+        with st.form("project_form", clear_on_submit=True):
+            project_name = st.text_input("Project Name*", key="proj_name")
+            project_technologies = st.text_input("Technologies Used*", placeholder="Python, React, MongoDB, etc.", key="proj_tech")
             project_description = st.text_area("Project Description*", height=100, 
-                                             placeholder="Describe the project, your role, and key achievements...")
-            project_link = st.text_input("Project Link (optional)", placeholder="GitHub link, live demo, etc.")
+                                             placeholder="Describe the project, your role, and key achievements...", key="proj_desc")
+            project_link = st.text_input("Project Link (optional)", placeholder="GitHub link, live demo, etc.", key="proj_link")
             
-            if st.form_submit_button("Add Project"):
+            submitted = st.form_submit_button("Add Project")
+            
+            if submitted:
                 if project_name and project_technologies and project_description:
                     st.session_state.resume_data['projects'].append({
                         'name': project_name,
@@ -1876,6 +1889,7 @@ def render_resume_builder():
                         'link': project_link
                     })
                     st.success("✅ Project added successfully!")
+                    st.rerun()
                 else:
                     st.error("❌ Please fill in all required fields")
         
@@ -1914,7 +1928,7 @@ def render_resume_builder():
     with st.expander("📋 Preview Resume Data"):
         st.json(st.session_state.resume_data)
     
-    # Export Options
+    # Export Options - FIXED PDF GENERATION
     st.subheader("📤 Export Your Resume")
     
     col1, col2, col3 = st.columns(3)
@@ -1922,8 +1936,12 @@ def render_resume_builder():
     with col1:
         if st.button("📄 Generate PDF", use_container_width=True, disabled=not required_fields_filled):
             if required_fields_filled:
-                st.info("PDF generation feature coming soon!")
-                st.success("✅ Your resume data is ready for PDF generation!")
+                # Generate and download PDF
+                pdf_content = generate_pdf_resume(st.session_state.resume_data)
+                b64 = base64.b64encode(pdf_content).decode()
+                href = f'<a href="data:application/pdf;base64,{b64}" download="resume_{st.session_state.resume_data["personal_info"]["name"].replace(" ", "_")}.pdf">📥 Download PDF Resume</a>'
+                st.markdown(href, unsafe_allow_html=True)
+                st.success("✅ PDF resume generated successfully!")
             else:
                 st.warning("Please fill in all required fields first")
     
@@ -1959,13 +1977,27 @@ def render_resume_builder():
     st.subheader(f"📊 Resume Completeness: {completeness}%")
     st.progress(completeness / 100)
 
-# Add these helper functions for date validation and completeness calculation
+# FIXED DATE VALIDATION FUNCTION
 def validate_date_format(date_str):
     """Validate date format MM/YYYY"""
     if date_str.lower() == 'present':
         return True
     try:
-        datetime.datetime.strptime(date_str, "%m/%Y")
+        parts = date_str.split('/')
+        if len(parts) != 2:
+            return False
+        month, year = parts
+        month_num = int(month)
+        year_num = int(year)
+        
+        # Check if month is valid (1-12)
+        if month_num < 1 or month_num > 12:
+            return False
+            
+        # Check if year is reasonable (e.g., 1900-2100)
+        if year_num < 1900 or year_num > 2100:
+            return False
+            
         return True
     except ValueError:
         return False
@@ -2009,6 +2041,249 @@ def calculate_resume_completeness(resume_data):
         earned_points += 15
     
     return int((earned_points / total_points) * 100) if total_points > 0 else 0
+
+# NEW: PDF GENERATION FUNCTION
+def generate_pdf_resume(resume_data):
+    """Generate a PDF resume from the resume data"""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        import io
+        
+        # Create a bytes buffer for the PDF
+        buffer = io.BytesIO()
+        
+        # Create the PDF document
+        doc = SimpleDocTemplate(buffer, pagesize=letter,
+                                rightMargin=72, leftMargin=72,
+                                topMargin=72, bottomMargin=18)
+        
+        # Container for the 'Flowable' objects
+        story = []
+        
+        # Styles
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=30,
+            textColor=colors.HexColor('#2c3e50')
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=16,
+            spaceAfter=12,
+            spaceBefore=12,
+            textColor=colors.HexColor('#34495e')
+        )
+        
+        normal_style = styles['Normal']
+        
+        # Personal Information
+        personal_info = resume_data['personal_info']
+        name = personal_info.get('name', '')
+        email = personal_info.get('email', '')
+        phone = personal_info.get('phone', '')
+        linkedin = personal_info.get('linkedin', '')
+        
+        # Add name as title
+        if name:
+            story.append(Paragraph(name.upper(), title_style))
+        
+        # Contact information
+        contact_info = []
+        if email:
+            contact_info.append(f"Email: {email}")
+        if phone:
+            contact_info.append(f"Phone: {phone}")
+        if linkedin:
+            contact_info.append(f"LinkedIn: {linkedin}")
+        
+        if contact_info:
+            story.append(Paragraph(" | ".join(contact_info), normal_style))
+            story.append(Spacer(1, 20))
+        
+        # Professional Summary
+        if resume_data.get('summary'):
+            story.append(Paragraph("PROFESSIONAL SUMMARY", heading_style))
+            story.append(Paragraph(resume_data['summary'], normal_style))
+            story.append(Spacer(1, 12))
+        
+        # Work Experience
+        if resume_data.get('experience'):
+            story.append(Paragraph("WORK EXPERIENCE", heading_style))
+            for exp in resume_data['experience']:
+                position = exp.get('position', '')
+                company = exp.get('company', '')
+                start_date = exp.get('start_date', '')
+                end_date = exp.get('end_date', '')
+                description = exp.get('description', '')
+                
+                # Experience header
+                exp_header = f"<b>{position}</b>"
+                if company:
+                    exp_header += f" | {company}"
+                if start_date or end_date:
+                    exp_header += f" | {start_date} - {end_date}"
+                
+                story.append(Paragraph(exp_header, normal_style))
+                
+                # Description
+                if description:
+                    # Clean up description for PDF
+                    desc_lines = description.split('\n')
+                    for line in desc_lines:
+                        if line.strip():
+                            story.append(Paragraph(f"• {line.strip()}", normal_style))
+                
+                story.append(Spacer(1, 8))
+        
+        # Education
+        if resume_data.get('education'):
+            story.append(Paragraph("EDUCATION", heading_style))
+            for edu in resume_data['education']:
+                degree = edu.get('degree', '')
+                institution = edu.get('institution', '')
+                start_date = edu.get('start_date', '')
+                end_date = edu.get('end_date', '')
+                description = edu.get('description', '')
+                
+                # Education header
+                edu_header = f"<b>{degree}</b>"
+                if institution:
+                    edu_header += f" | {institution}"
+                if start_date or end_date:
+                    edu_header += f" | {start_date} - {end_date}"
+                
+                story.append(Paragraph(edu_header, normal_style))
+                
+                # Description
+                if description:
+                    story.append(Paragraph(description, normal_style))
+                
+                story.append(Spacer(1, 8))
+        
+        # Skills
+        if resume_data.get('skills'):
+            story.append(Paragraph("SKILLS", heading_style))
+            skills_text = ", ".join(resume_data['skills'])
+            story.append(Paragraph(skills_text, normal_style))
+            story.append(Spacer(1, 12))
+        
+        # Projects
+        if resume_data.get('projects'):
+            story.append(Paragraph("PROJECTS", heading_style))
+            for project in resume_data['projects']:
+                name = project.get('name', '')
+                technologies = project.get('technologies', '')
+                description = project.get('description', '')
+                link = project.get('link', '')
+                
+                # Project header
+                proj_header = f"<b>{name}</b>"
+                if technologies:
+                    proj_header += f" | {technologies}"
+                
+                story.append(Paragraph(proj_header, normal_style))
+                
+                # Description
+                if description:
+                    story.append(Paragraph(description, normal_style))
+                
+                # Link
+                if link:
+                    story.append(Paragraph(f"Link: {link}", normal_style))
+                
+                story.append(Spacer(1, 8))
+        
+        # Build PDF
+        doc.build(story)
+        
+        # Get PDF content
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        return pdf_content
+        
+    except Exception as e:
+        # Fallback: Return a simple text PDF
+        st.warning(f"PDF generation issue: {str(e)}. Using fallback PDF.")
+        return create_fallback_pdf(resume_data)
+
+def create_fallback_pdf(resume_data):
+    """Create a simple fallback PDF when advanced generation fails"""
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    import io
+    
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+    
+    # Set up basic info
+    p.setFont("Helvetica-Bold", 16)
+    personal_info = resume_data['personal_info']
+    name = personal_info.get('name', 'Resume')
+    p.drawString(100, 750, f"RESUME: {name.upper()}")
+    
+    y_position = 730
+    
+    # Contact info
+    p.setFont("Helvetica", 10)
+    contact_lines = []
+    if personal_info.get('email'):
+        contact_lines.append(f"Email: {personal_info['email']}")
+    if personal_info.get('phone'):
+        contact_lines.append(f"Phone: {personal_info['phone']}")
+    
+    for line in contact_lines:
+        p.drawString(100, y_position, line)
+        y_position -= 15
+    
+    y_position -= 10
+    
+    # Summary
+    if resume_data.get('summary'):
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(100, y_position, "PROFESSIONAL SUMMARY")
+        y_position -= 20
+        p.setFont("Helvetica", 10)
+        # Simple text wrapping
+        summary = resume_data['summary']
+        words = summary.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            if len(current_line + word) < 80:
+                current_line += word + " "
+            else:
+                lines.append(current_line)
+                current_line = word + " "
+        if current_line:
+            lines.append(current_line)
+        
+        for line in lines:
+            if y_position < 50:  # New page if needed
+                p.showPage()
+                y_position = 750
+            p.drawString(100, y_position, line)
+            y_position -= 15
+        
+        y_position -= 10
+    
+    p.save()
+    pdf_content = buffer.getvalue()
+    buffer.close()
+    return pdf_content
+
 # -----------------------------
 # Career Analytics (Placeholder)
 # -----------------------------
