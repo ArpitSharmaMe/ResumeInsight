@@ -1,3 +1,5 @@
+# ResumeInsight Pro - Enhanced Resume Analyzer
+
 # FORCE NLTK DOWNLOAD BEFORE ANY IMPORTS - FIX FOR STREAMLIT CLOUD
 import nltk
 import os
@@ -18,7 +20,14 @@ try:
     
     for package in required_packages:
         try:
-            nltk.data.find(f'corpora/{package}' if package == 'stopwords' else f'tokenizers/{package}' if package == 'punkt' else f'taggers/{package}' if package == 'averaged_perceptron_tagger' else f'corpora/{package}')
+            if package == 'stopwords':
+                nltk.data.find('corpora/stopwords')
+            elif package == 'punkt':
+                nltk.data.find('tokenizers/punkt')
+            elif package == 'averaged_perceptron_tagger':
+                nltk.data.find('taggers/averaged_perceptron_tagger')
+            elif package == 'wordnet':
+                nltk.data.find('corpora/wordnet')
             print(f"✅ NLTK {package} already available")
         except LookupError:
             print(f"📥 Downloading NLTK {package}...")
@@ -48,13 +57,31 @@ from pdfminer.converter import TextConverter
 # OCR features disabled for deployment
 OCR_AVAILABLE = False
 
-# IMPORTANT: Set NLTK data path again before importing pyresparser
+# FIX FOR SPACY MODEL ERROR
+import spacy
+import subprocess
+import sys
+
+# Set NLTK data path again before importing pyresparser
 nltk.data.path.append(nltk_data_path)
 
 try:
-    from pyresparser import ResumeParser
+    # Try to load the spaCy model
+    nlp = spacy.load("en_core_web_sm")
+    print("✅ spaCy model loaded successfully")
+except OSError:
+    print("📥 spaCy model not found, using fallback parsing")
+    nlp = None
 except Exception as e:
-    st.error(f"Resume parser loading issue: {e}")
+    print(f"⚠️ spaCy model error: {e}")
+    nlp = None
+
+# Safe import for pyresparser with error handling
+try:
+    from pyresparser import ResumeParser
+    print("✅ pyresparser imported successfully")
+except Exception as e:
+    print(f"⚠️ pyresparser import issue: {e}")
     # Create a mock ResumeParser for fallback
     class MockResumeParser:
         def __init__(self, file_path):
@@ -77,7 +104,71 @@ except Exception as e:
     ResumeParser = MockResumeParser
     print("⚠️ Using fallback resume parser")
 
-from streamlit_tags import st_tags
+# CUSTOM TAGS COMPONENT TO REPLACE STREAMLIT_TAGS
+def custom_tags_input(label, value=None, suggestions=None, key=None):
+    """
+    Custom tags input component to replace streamlit_tags
+    """
+    if value is None:
+        value = []
+    
+    if suggestions is None:
+        suggestions = []
+    
+    # Create a unique key for session state
+    tags_key = f"tags_{key}" if key else "tags_default"
+    
+    # Initialize session state
+    if tags_key not in st.session_state:
+        st.session_state[tags_key] = value
+    
+    # Display current tags
+    st.write(f"**{label}**")
+    
+    # Show current tags as chips
+    if st.session_state[tags_key]:
+        tags_html = "<div style='margin-bottom: 10px;'>"
+        for tag in st.session_state[tags_key]:
+            tags_html += f"<span style='background-color: #667eea; color: white; padding: 4px 12px; margin: 2px; border-radius: 16px; display: inline-block; font-size: 14px;'>{tag}</span>"
+        tags_html += "</div>"
+        st.markdown(tags_html, unsafe_allow_html=True)
+    
+    # Input for new tag
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        new_tag = st.text_input("Add a skill (press Enter or click Add)", key=f"input_{key}")
+    with col2:
+        add_clicked = st.button("Add", key=f"add_{key}")
+    
+    # Add tag logic
+    if (new_tag and new_tag.strip()) and (add_clicked or st.session_state.get(f"input_{key}_submitted", False)):
+        tag_text = new_tag.strip()
+        if tag_text and tag_text not in st.session_state[tags_key]:
+            st.session_state[tags_key].append(tag_text)
+        # Clear the input
+        st.session_state[f"input_{key}"] = ""
+    
+    # Quick suggestions
+    if suggestions and st.session_state[tags_key]:
+        st.write("Quick add:")
+        sugg_cols = st.columns(4)
+        for idx, sugg in enumerate(suggestions[:4]):
+            if sugg not in st.session_state[tags_key]:
+                if sugg_cols[idx % 4].button(sugg, key=f"sugg_{key}_{idx}"):
+                    st.session_state[tags_key].append(sugg)
+                    st.rerun()
+    
+    # Remove tag option
+    if st.session_state[tags_key]:
+        st.write("Remove tags:")
+        remove_cols = st.columns(4)
+        for idx, tag in enumerate(st.session_state[tags_key]):
+            if remove_cols[idx % 4].button(f"❌ {tag}", key=f"remove_{key}_{idx}"):
+                st.session_state[tags_key].remove(tag)
+                st.rerun()
+    
+    return st.session_state[tags_key]
+
 from PIL import Image
 import sqlite3  # Using SQLite for deployment
 
@@ -86,13 +177,27 @@ try:
     from Courses import ds_course, web_course, android_course, ios_course, uiux_course, resume_videos, interview_videos
 except:
     # Fallback course data
-    ds_course = [("Python for Data Science", "https://example.com"), ("Machine Learning Basics", "https://example.com")]
-    web_course = [("Web Development Fundamentals", "https://example.com")]
-    android_course = [("Android Development", "https://example.com")]
-    ios_course = [("iOS Development", "https://example.com")]
-    uiux_course = [("UI/UX Design", "https://example.com")]
-    resume_videos = [("How to write a great resume", "https://youtube.com/watch?v=example1")]
-    interview_videos = [("Interview preparation tips", "https://youtube.com/watch?v=example2")]
+    ds_course = [("Python for Data Science", "https://www.coursera.org/specializations/data-science-python"), 
+                ("Machine Learning Basics", "https://www.coursera.org/learn/machine-learning"),
+                ("Data Analysis with Python", "https://www.coursera.org/learn/data-analysis-with-python")]
+    web_course = [("Web Development Fundamentals", "https://www.coursera.org/specializations/web-design"),
+                 ("Full Stack Web Development", "https://www.coursera.org/specializations/full-stack-react"),
+                 ("JavaScript Programming", "https://www.coursera.org/specializations/javascript-beginner")]
+    android_course = [("Android Development", "https://www.coursera.org/learn/android-app-development"),
+                     ("Kotlin for Android", "https://www.coursera.org/learn/kotlin-for-android"),
+                     ("Mobile App Development", "https://www.coursera.org/specializations/android-app-development")]
+    ios_course = [("iOS Development with Swift", "https://www.coursera.org/learn/ios-development-swift"),
+                 ("Swift Programming", "https://www.coursera.org/learn/swift-programming"),
+                 ("Mobile App Design", "https://www.coursera.org/learn/mobile-app-design")]
+    uiux_course = [("UI/UX Design", "https://www.coursera.org/specializations/ui-ux-design"),
+                  ("Interaction Design", "https://www.coursera.org/learn/interaction-design"),
+                  ("User Research", "https://www.coursera.org/learn/user-research")]
+    resume_videos = [("How to write a great resume", "https://youtube.com/watch?v=BYUyjn3fhV4"),
+                    ("Resume tips for 2024", "https://youtube.com/watch?v=9hdz2i6e1yw"),
+                    ("ATS Resume Guide", "https://youtube.com/watch?v=6tZfp8l7l_s")]
+    interview_videos = [("Interview preparation tips", "https://youtube.com/watch?v=HG68Ymazo18"),
+                       ("Technical Interview Guide", "https://youtube.com/watch?v=1qw5ITr3k9E"),
+                       ("Behavioral Interview Questions", "https://youtube.com/watch?v=PJm6kdkKG94")]
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -102,6 +207,7 @@ from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+
 # -----------------------------
 # Enhanced Configuration
 # -----------------------------
@@ -765,7 +871,7 @@ def interview_question_generator():
             num_questions = st.slider("Number of Questions", 5, 25, 15)
             difficulty = st.select_slider("Difficulty Level", options=["Easy", "Medium", "Hard", "Mixed"])
         
-        # Use text input for skills instead of st_tags for better reliability
+        # Use text input for skills instead of custom_tags_input
         skills_input = st.text_input("Your Key Skills* (comma separated)", 
                                    placeholder="e.g., Python, JavaScript, React, AWS, SQL")
         
@@ -1006,12 +1112,19 @@ def display_questions(questions, job_role, experience_level):
     b64 = base64.b64encode(questions_text.encode()).decode()
     href = f'<a href="data:file/txt;base64,{b64}" download="interview_questions_{job_role.replace(" ", "_")}.txt">📥 Download Questions as Text</a>'
     st.markdown(href, unsafe_allow_html=True)
-    
+
 # -----------------------------
 # User Section
 # -----------------------------
 def run_user_section():
-    """Enhanced User Section - UPDATED FOR DEPLOYMENT"""
+    """Enhanced User Section - FIXED FOR SPACY MODEL ERROR"""
+    
+    # Show friendly warning about limited features
+    st.warning("""
+    ⚠️ **Note:** Some advanced parsing features are currently limited. 
+    Basic resume analysis is still available and functional.
+    """)
+    
     st.subheader("👤 Resume Analysis")
     user_name = st.text_input("Full Name", placeholder="Enter your full name")
     
@@ -1039,18 +1152,25 @@ def run_user_section():
             
             st.markdown("---")
             
-            # Resume Analysis
+            # Resume Analysis with spaCy error handling
             resume_data = {}
+            raw_text = ""
+            
             try:
+                # First try advanced parsing
                 resume_data = ResumeParser(save_path).get_extracted_data()
+                st.success("✅ Advanced resume parsing completed")
             except Exception as e:
-                st.warning(f"Advanced parsing failed: {str(e)}")
+                st.warning(f"⚠️ Advanced parsing features limited: {str(e)}")
+                # Fallback to basic parsing
                 resume_data = {}
-
+            
+            # Always extract text for fallback analysis
             raw_text = extract_text_pypdf2(save_path)
             if not raw_text.strip():
                 raw_text = pdfminer_extract_text(save_path)
 
+            # Enhanced data extraction with fallbacks
             resume_data['email'] = resume_data.get('email') or extract_email(raw_text)
             resume_data['mobile_number'] = resume_data.get('mobile_number') or extract_phone(raw_text)
             resume_data['skills'] = resume_data.get('skills') or extract_skills_from_text(raw_text)
@@ -1070,9 +1190,9 @@ def run_user_section():
             
         except Exception as e:
             st.error(f"File processing error: {str(e)}")
-            # Fallback: Process file directly from memory
+            # Ultimate fallback
             try:
-                st.info("🔄 Using fallback processing...")
+                st.info("🔄 Using basic text analysis...")
                 raw_text = extract_text_pypdf2(pdf_file)
                 if not raw_text.strip():
                     raw_text = ""
@@ -1087,16 +1207,13 @@ def run_user_section():
                     'education': []
                 }
                 
-                no_of_pages = 1  # Default
-                
-                # Enhanced Resume Scoring
+                no_of_pages = 1
                 enhanced_score = enhanced_resume_scoring(resume_data, raw_text)
-                
-                # Display Results
                 display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages)
                 
             except Exception as parse_error:
                 st.error(f"Error analyzing resume: {str(parse_error)}")
+                st.info("💡 Try uploading a different PDF file or check the file format")
 
 def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages):
     """Display enhanced analysis results"""
@@ -1147,7 +1264,16 @@ def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages)
         """, 
         unsafe_allow_html=True
     )
-    st_tags(label='', text='See our skills recommendation below', value=skills_list, key='skills_1')
+    
+    # Display skills as chips using custom function
+    if skills_list:
+        skills_html = "<div style='margin-bottom: 20px;'>"
+        for skill in skills_list:
+            skills_html += f"<span style='background-color: #667eea; color: white; padding: 8px 16px; margin: 4px; border-radius: 20px; display: inline-block; font-size: 14px;'>{skill}</span>"
+        skills_html += "</div>"
+        st.markdown(skills_html, unsafe_allow_html=True)
+    else:
+        st.info("No skills detected. Try adding a 'Skills' section to your resume.")
 
     # Enhanced Resume Score
     st.markdown(
@@ -1592,14 +1718,21 @@ def render_resume_builder():
     
     # Skills
     with st.expander("🛠️ Skills"):
-        skills_input = st_tags(
-            label='Add Skills',
-            text='Press enter after each skill',
-            value=st.session_state.resume_data['skills'],
-            suggestions=['Python', 'JavaScript', 'React', 'AWS', 'Docker', 'SQL'],
-            key='skills_builder'
-        )
-        st.session_state.resume_data['skills'] = skills_input
+        # Use custom tags input for skills
+        skills_input = st.text_input("Add Skills (comma separated)", 
+                                   placeholder="Python, JavaScript, React, AWS, SQL")
+        if skills_input:
+            skills_list = [skill.strip() for skill in skills_input.split(',')]
+            st.session_state.resume_data['skills'] = skills_list
+        
+        # Display current skills
+        if st.session_state.resume_data['skills']:
+            st.write("Current Skills:")
+            skills_html = "<div>"
+            for skill in st.session_state.resume_data['skills']:
+                skills_html += f"<span style='background-color: #667eea; color: white; padding: 4px 12px; margin: 2px; border-radius: 16px; display: inline-block; font-size: 14px;'>{skill}</span>"
+            skills_html += "</div>"
+            st.markdown(skills_html, unsafe_allow_html=True)
     
     # Export Options
     st.markdown("---")
@@ -1778,6 +1911,3 @@ def run():
 
 if __name__ == "__main__":
     run()
-
-
-
