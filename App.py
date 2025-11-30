@@ -1,27 +1,58 @@
-# ResumeInsight Pro - Enhanced Resume Analyzer
-
 # FORCE NLTK DOWNLOAD BEFORE ANY IMPORTS - FIX FOR DEPLOYMENT
 import nltk
 import os
+import sys
 
-# Create nltk_data directory and download required data
+# Set NLTK data path before any imports that might use NLTK
+nltk_data_path = '/home/adminuser/venv/nltk_data'
+os.makedirs(nltk_data_path, exist_ok=True)
+
+# Add to NLTK path and set environment variable
+nltk.data.path.append(nltk_data_path)
+os.environ['NLTK_DATA'] = nltk_data_path
+
+# Download required NLTK data with error handling
 try:
-    nltk_data_path = '/home/adminuser/venv/nltk_data'
-    os.makedirs(nltk_data_path, exist_ok=True)
-    nltk.data.path.append(nltk_data_path)
+    # Check if data already exists
+    try:
+        nltk.data.find('corpora/stopwords')
+        print("✅ NLTK stopwords already available")
+    except LookupError:
+        print("📥 Downloading NLTK stopwords...")
+        nltk.download('stopwords', download_dir=nltk_data_path, quiet=True)
     
-    # Download required NLTK data
-    nltk.download('stopwords', download_dir=nltk_data_path, quiet=True)
-    nltk.download('punkt', download_dir=nltk_data_path, quiet=True)
-    print("✅ NLTK data downloaded successfully")
+    try:
+        nltk.data.find('tokenizers/punkt')
+        print("✅ NLTK punkt already available")
+    except LookupError:
+        print("📥 Downloading NLTK punkt...")
+        nltk.download('punkt', download_dir=nltk_data_path, quiet=True)
+        
+    try:
+        nltk.data.find('taggers/averaged_perceptron_tagger')
+        print("✅ NLTK averaged_perceptron_tagger already available")
+    except LookupError:
+        print("📥 Downloading NLTK averaged_perceptron_tagger...")
+        nltk.download('averaged_perceptron_tagger', download_dir=nltk_data_path, quiet=True)
+        
+    print("✅ All NLTK data ready")
+    
 except Exception as e:
     print(f"⚠️ NLTK download warning: {e}")
+    # Try alternative download method
+    try:
+        nltk.download('stopwords', quiet=True)
+        nltk.download('punkt', quiet=True)
+        nltk.download('averaged_perceptron_tagger', quiet=True)
+        print("✅ NLTK data downloaded via alternative method")
+    except Exception as e2:
+        print(f"❌ NLTK download failed: {e2}")
 
 # Now import other packages
 import streamlit as st
 import pandas as pd
 import base64
-import random
+# ... rest of your imports
 import time
 import datetime
 import io
@@ -1678,3 +1709,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+
