@@ -1,4 +1,23 @@
 # ResumeInsight Pro - Enhanced Resume Analyzer
+
+# FORCE NLTK DOWNLOAD BEFORE ANY IMPORTS - FIX FOR DEPLOYMENT
+import nltk
+import os
+
+# Create nltk_data directory and download required data
+try:
+    nltk_data_path = '/home/adminuser/venv/nltk_data'
+    os.makedirs(nltk_data_path, exist_ok=True)
+    nltk.data.path.append(nltk_data_path)
+    
+    # Download required NLTK data
+    nltk.download('stopwords', download_dir=nltk_data_path, quiet=True)
+    nltk.download('punkt', download_dir=nltk_data_path, quiet=True)
+    print("✅ NLTK data downloaded successfully")
+except Exception as e:
+    print(f"⚠️ NLTK download warning: {e}")
+
+# Now import other packages
 import streamlit as st
 import pandas as pd
 import base64
@@ -6,7 +25,6 @@ import random
 import time
 import datetime
 import io
-import os
 import re
 import json
 from PyPDF2 import PdfReader
@@ -39,26 +57,11 @@ except:
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-
-# Download NLTK data if not available - FIX FOR DEPLOYMENT
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords', quiet=True)
-    nltk.download('punkt', quiet=True)
-
-# Download NLTK data quietly
-try:
-    nltk.download('stopwords', quiet=True)
-    nltk.download('punkt', quiet=True)
-except:
-    pass
 
 # -----------------------------
 # Enhanced Configuration
@@ -149,7 +152,6 @@ def get_db_connection():
     """
     try:
         conn = sqlite3.connect('resume_analyzer.db', check_same_thread=False)
-        st.sidebar.success("✅ Connected to SQLite database")
         return conn
     except Exception as e:
         st.sidebar.error(f"❌ Database connection failed: {str(e)}")
