@@ -1619,12 +1619,12 @@ def render_resume_builder():
         col1, col2 = st.columns(2)
         with col1:
             st.session_state.resume_data['personal_info']['name'] = st.text_input(
-                "Full Name", 
+                "Full Name*", 
                 value=st.session_state.resume_data['personal_info']['name'],
                 placeholder="John Doe"
             )
             st.session_state.resume_data['personal_info']['email'] = st.text_input(
-                "Email", 
+                "Email*", 
                 value=st.session_state.resume_data['personal_info']['email'],
                 placeholder="john.doe@email.com"
             )
@@ -1643,7 +1643,7 @@ def render_resume_builder():
     # Professional Summary
     with st.expander("📄 Professional Summary"):
         st.session_state.resume_data['summary'] = st.text_area(
-            "Summary",
+            "Summary*",
             value=st.session_state.resume_data['summary'],
             placeholder="Experienced software developer with 5+ years in web development...",
             height=100
@@ -1655,16 +1655,51 @@ def render_resume_builder():
         with st.form("experience_form"):
             col1, col2 = st.columns(2)
             with col1:
-                company = st.text_input("Company")
-                position = st.text_input("Position")
+                company = st.text_input("Company*")
+                position = st.text_input("Position*")
             with col2:
-                start_date = st.text_input("Start Date (MM/YYYY)")
-                end_date = st.text_input("End Date (MM/YYYY) or 'Present'")
+                start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="01/2020")
+                end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="12/2023 or Present")
             
-            description = st.text_area("Description", height=100)
+            description = st.text_area("Description*", height=100, placeholder="Describe your responsibilities and achievements...")
             
             if st.form_submit_button("Add Experience"):
-                if company and position:
+                # Validation
+                errors = []
+                
+                if not company:
+                    errors.append("Company name is required")
+                if not position:
+                    errors.append("Position is required")
+                if not start_date:
+                    errors.append("Start date is required")
+                if not description:
+                    errors.append("Description is required")
+                
+                # Date validation
+                if start_date and start_date.lower() != 'present':
+                    if not validate_date_format(start_date):
+                        errors.append("Start date must be in MM/YYYY format (e.g., 01/2020)")
+                
+                if end_date and end_date.lower() != 'present':
+                    if not validate_date_format(end_date):
+                        errors.append("End date must be in MM/YYYY format (e.g., 12/2023) or 'Present'")
+                
+                # Date logic validation
+                if (start_date and end_date and 
+                    start_date.lower() != 'present' and end_date.lower() != 'present' and
+                    validate_date_format(start_date) and validate_date_format(end_date)):
+                    
+                    start_dt = datetime.datetime.strptime(start_date, "%m/%Y")
+                    end_dt = datetime.datetime.strptime(end_date, "%m/%Y")
+                    
+                    if end_dt < start_dt:
+                        errors.append("End date cannot be before start date")
+                
+                if errors:
+                    for error in errors:
+                        st.error(f"❌ {error}")
+                else:
                     st.session_state.resume_data['experience'].append({
                         'company': company,
                         'position': position,
@@ -1672,15 +1707,24 @@ def render_resume_builder():
                         'end_date': end_date,
                         'description': description
                     })
-                    st.success("Experience added!")
+                    st.success("✅ Experience added successfully!")
         
         # Display experiences
-        for i, exp in enumerate(st.session_state.resume_data['experience']):
-            st.write(f"**{exp['position']}** at {exp['company']} ({exp['start_date']} - {exp['end_date']})")
-            st.write(exp['description'])
-            if st.button(f"Remove", key=f"remove_exp_{i}"):
-                st.session_state.resume_data['experience'].pop(i)
-                st.rerun()
+        if st.session_state.resume_data['experience']:
+            st.subheader("Your Work Experience")
+            for i, exp in enumerate(st.session_state.resume_data['experience']):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**{exp['position']}** at **{exp['company']}**")
+                    st.markdown(f"*{exp['start_date']} - {exp['end_date']}*")
+                    st.write(exp['description'])
+                with col2:
+                    if st.button(f"🗑️ Remove", key=f"remove_exp_{i}"):
+                        st.session_state.resume_data['experience'].pop(i)
+                        st.rerun()
+                st.markdown("---")
+        else:
+            st.info("💡 Add your work experience to build a comprehensive resume")
     
     # Education Section
     with st.expander("🎓 Education"):
@@ -1688,16 +1732,50 @@ def render_resume_builder():
         with st.form("education_form"):
             col1, col2 = st.columns(2)
             with col1:
-                institution = st.text_input("Institution/University")
-                degree = st.text_input("Degree/Certificate")
+                institution = st.text_input("Institution/University*")
+                degree = st.text_input("Degree/Certificate*")
             with col2:
-                ed_start_date = st.text_input("Start Date (MM/YYYY)", key="ed_start")
-                ed_end_date = st.text_input("End Date (MM/YYYY) or 'Present'", key="ed_end")
+                ed_start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="08/2018", key="ed_start")
+                ed_end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="05/2022", key="ed_end")
             
-            ed_description = st.text_area("Description/Achievements", height=100, key="ed_desc")
+            ed_description = st.text_area("Description/Achievements", height=100, key="ed_desc", 
+                                        placeholder="GPA, honors, relevant coursework, achievements...")
             
             if st.form_submit_button("Add Education"):
-                if institution and degree:
+                # Validation
+                errors = []
+                
+                if not institution:
+                    errors.append("Institution name is required")
+                if not degree:
+                    errors.append("Degree is required")
+                if not ed_start_date:
+                    errors.append("Start date is required")
+                
+                # Date validation
+                if ed_start_date and ed_start_date.lower() != 'present':
+                    if not validate_date_format(ed_start_date):
+                        errors.append("Start date must be in MM/YYYY format (e.g., 08/2018)")
+                
+                if ed_end_date and ed_end_date.lower() != 'present':
+                    if not validate_date_format(ed_end_date):
+                        errors.append("End date must be in MM/YYYY format (e.g., 05/2022) or 'Present'")
+                
+                # Date logic validation
+                if (ed_start_date and ed_end_date and 
+                    ed_start_date.lower() != 'present' and ed_end_date.lower() != 'present' and
+                    validate_date_format(ed_start_date) and validate_date_format(ed_end_date)):
+                    
+                    start_dt = datetime.datetime.strptime(ed_start_date, "%m/%Y")
+                    end_dt = datetime.datetime.strptime(ed_end_date, "%m/%Y")
+                    
+                    if end_dt < start_dt:
+                        errors.append("End date cannot be before start date")
+                
+                if errors:
+                    for error in errors:
+                        st.error(f"❌ {error}")
+                else:
                     st.session_state.resume_data['education'].append({
                         'institution': institution,
                         'degree': degree,
@@ -1705,52 +1783,161 @@ def render_resume_builder():
                         'end_date': ed_end_date,
                         'description': ed_description
                     })
-                    st.success("Education added!")
+                    st.success("✅ Education added successfully!")
         
         # Display education entries
-        for i, edu in enumerate(st.session_state.resume_data['education']):
-            st.write(f"**{edu['degree']}** at {edu['institution']} ({edu['start_date']} - {edu['end_date']})")
-            if edu['description']:
-                st.write(edu['description'])
-            if st.button(f"Remove", key=f"remove_edu_{i}"):
-                st.session_state.resume_data['education'].pop(i)
-                st.rerun()
+        if st.session_state.resume_data['education']:
+            st.subheader("Your Education")
+            for i, edu in enumerate(st.session_state.resume_data['education']):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**{edu['degree']}**")
+                    st.markdown(f"*{edu['institution']}*")
+                    st.markdown(f"*{edu['start_date']} - {edu['end_date']}*")
+                    if edu['description']:
+                        st.write(edu['description'])
+                with col2:
+                    if st.button(f"🗑️ Remove", key=f"remove_edu_{i}"):
+                        st.session_state.resume_data['education'].pop(i)
+                        st.rerun()
+                st.markdown("---")
+        else:
+            st.info("💡 Add your education history to build a comprehensive resume")
     
     # Skills
     with st.expander("🛠️ Skills"):
-        # Use custom tags input for skills
-        skills_input = st.text_input("Add Skills (comma separated)", 
-                                   placeholder="Python, JavaScript, React, AWS, SQL")
-        if skills_input:
-            skills_list = [skill.strip() for skill in skills_input.split(',')]
-            st.session_state.resume_data['skills'] = skills_list
+        st.subheader("Add Your Skills")
+        
+        # Skills input with categories
+        skill_categories = {
+            "Technical Skills": ["Python", "JavaScript", "Java", "C++", "SQL", "React", "Node.js", "AWS", "Docker", "Git"],
+            "Soft Skills": ["Communication", "Leadership", "Teamwork", "Problem Solving", "Time Management", "Adaptability"],
+            "Tools & Technologies": ["VS Code", "Figma", "Jira", "Slack", "Photoshop", "Excel"]
+        }
+        
+        selected_category = st.selectbox("Skill Category", list(skill_categories.keys()))
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            new_skill = st.text_input("Add Skill", placeholder="Enter a skill or select from suggestions")
+        with col2:
+            add_skill_btn = st.button("Add Skill", use_container_width=True)
+        
+        # Quick suggestions
+        st.write("Quick add:")
+        sugg_cols = st.columns(4)
+        for idx, skill in enumerate(skill_categories[selected_category][:4]):
+            if sugg_cols[idx].button(skill, key=f"sugg_{selected_category}_{idx}"):
+                if skill not in st.session_state.resume_data['skills']:
+                    st.session_state.resume_data['skills'].append(skill)
+                    st.rerun()
+        
+        if add_skill_btn and new_skill:
+            skill_text = new_skill.strip()
+            if skill_text and skill_text not in st.session_state.resume_data['skills']:
+                st.session_state.resume_data['skills'].append(skill_text)
+                st.rerun()
         
         # Display current skills
         if st.session_state.resume_data['skills']:
-            st.write("Current Skills:")
-            skills_html = "<div>"
+            st.subheader("Your Skills")
+            skills_html = "<div style='margin-bottom: 20px;'>"
             for skill in st.session_state.resume_data['skills']:
-                skills_html += f"<span style='background-color: #667eea; color: white; padding: 4px 12px; margin: 2px; border-radius: 16px; display: inline-block; font-size: 14px;'>{skill}</span>"
+                skills_html += f"<span style='background-color: #667eea; color: white; padding: 8px 16px; margin: 4px; border-radius: 20px; display: inline-block; font-size: 14px;'>{skill}</span>"
             skills_html += "</div>"
             st.markdown(skills_html, unsafe_allow_html=True)
+            
+            # Remove skills
+            st.write("Remove skills:")
+            remove_cols = st.columns(4)
+            for idx, skill in enumerate(st.session_state.resume_data['skills']):
+                if remove_cols[idx % 4].button(f"❌ {skill}", key=f"remove_skill_{idx}"):
+                    st.session_state.resume_data['skills'].remove(skill)
+                    st.rerun()
+        else:
+            st.info("💡 Add your skills to showcase your capabilities")
+    
+    # Projects Section
+    with st.expander("🚀 Projects"):
+        st.subheader("Add Projects")
+        with st.form("project_form"):
+            project_name = st.text_input("Project Name*")
+            project_technologies = st.text_input("Technologies Used*", placeholder="Python, React, MongoDB, etc.")
+            project_description = st.text_area("Project Description*", height=100, 
+                                             placeholder="Describe the project, your role, and key achievements...")
+            project_link = st.text_input("Project Link (optional)", placeholder="GitHub link, live demo, etc.")
+            
+            if st.form_submit_button("Add Project"):
+                if project_name and project_technologies and project_description:
+                    st.session_state.resume_data['projects'].append({
+                        'name': project_name,
+                        'technologies': project_technologies,
+                        'description': project_description,
+                        'link': project_link
+                    })
+                    st.success("✅ Project added successfully!")
+                else:
+                    st.error("❌ Please fill in all required fields")
+        
+        # Display projects
+        if st.session_state.resume_data['projects']:
+            st.subheader("Your Projects")
+            for i, project in enumerate(st.session_state.resume_data['projects']):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**{project['name']}**")
+                    st.markdown(f"*Technologies: {project['technologies']}*")
+                    st.write(project['description'])
+                    if project['link']:
+                        st.markdown(f"[View Project]({project['link']})")
+                with col2:
+                    if st.button(f"🗑️ Remove", key=f"remove_project_{i}"):
+                        st.session_state.resume_data['projects'].pop(i)
+                        st.rerun()
+                st.markdown("---")
+    
+    # Resume Preview and Export
+    st.markdown("---")
+    st.subheader("👀 Resume Preview")
+    
+    # Basic validation for required fields
+    required_fields_filled = (
+        st.session_state.resume_data['personal_info']['name'] and
+        st.session_state.resume_data['personal_info']['email'] and
+        st.session_state.resume_data['summary']
+    )
+    
+    if not required_fields_filled:
+        st.warning("⚠️ Please fill in all required fields (marked with *) to enable export")
+    
+    # Preview current resume data
+    with st.expander("📋 Preview Resume Data"):
+        st.json(st.session_state.resume_data)
     
     # Export Options
-    st.markdown("---")
     st.subheader("📤 Export Your Resume")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📄 Generate PDF", use_container_width=True):
-            st.info("PDF generation feature coming soon!")
+        if st.button("📄 Generate PDF", use_container_width=True, disabled=not required_fields_filled):
+            if required_fields_filled:
+                st.info("PDF generation feature coming soon!")
+                st.success("✅ Your resume data is ready for PDF generation!")
+            else:
+                st.warning("Please fill in all required fields first")
     
     with col2:
-        if st.button("📊 Download as JSON", use_container_width=True):
-            # Create download link for JSON
-            json_str = json.dumps(st.session_state.resume_data, indent=2)
-            b64 = base64.b64encode(json_str.encode()).decode()
-            href = f'<a href="data:file/json;base64,{b64}" download="resume_data.json">Download JSON Resume</a>'
-            st.markdown(href, unsafe_allow_html=True)
+        if st.button("📊 Download as JSON", use_container_width=True, disabled=not required_fields_filled):
+            if required_fields_filled:
+                # Create download link for JSON
+                json_str = json.dumps(st.session_state.resume_data, indent=2, ensure_ascii=False)
+                b64 = base64.b64encode(json_str.encode()).decode()
+                href = f'<a href="data:file/json;base64,{b64}" download="resume_data.json">📥 Download JSON Resume</a>'
+                st.markdown(href, unsafe_allow_html=True)
+                st.success("✅ Resume data exported as JSON!")
+            else:
+                st.warning("Please fill in all required fields first")
     
     with col3:
         if st.button("🔄 Reset Form", use_container_width=True):
@@ -1763,8 +1950,65 @@ def render_resume_builder():
                 'projects': [],
                 'certifications': []
             }
+            st.success("✅ Form reset successfully!")
             st.rerun()
+    
+    # Resume completeness indicator
+    st.markdown("---")
+    completeness = calculate_resume_completeness(st.session_state.resume_data)
+    st.subheader(f"📊 Resume Completeness: {completeness}%")
+    st.progress(completeness / 100)
 
+# Add these helper functions for date validation and completeness calculation
+def validate_date_format(date_str):
+    """Validate date format MM/YYYY"""
+    if date_str.lower() == 'present':
+        return True
+    try:
+        datetime.datetime.strptime(date_str, "%m/%Y")
+        return True
+    except ValueError:
+        return False
+
+def calculate_resume_completeness(resume_data):
+    """Calculate how complete the resume is"""
+    total_points = 0
+    earned_points = 0
+    
+    # Personal info (30 points)
+    total_points += 30
+    if resume_data['personal_info']['name']:
+        earned_points += 10
+    if resume_data['personal_info']['email']:
+        earned_points += 10
+    if resume_data['personal_info']['phone']:
+        earned_points += 5
+    if resume_data['personal_info']['linkedin']:
+        earned_points += 5
+    
+    # Summary (15 points)
+    total_points += 15
+    if resume_data['summary']:
+        earned_points += 15
+    
+    # Experience (25 points)
+    total_points += 25
+    if resume_data['experience']:
+        earned_points += 25
+    elif any([resume_data['personal_info']['name'], resume_data['personal_info']['email']]):
+        earned_points += 10  # Partial credit if basic info exists
+    
+    # Education (15 points)
+    total_points += 15
+    if resume_data['education']:
+        earned_points += 15
+    
+    # Skills (15 points)
+    total_points += 15
+    if resume_data['skills']:
+        earned_points += 15
+    
+    return int((earned_points / total_points) * 100) if total_points > 0 else 0
 # -----------------------------
 # Career Analytics (Placeholder)
 # -----------------------------
