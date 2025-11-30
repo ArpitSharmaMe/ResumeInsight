@@ -10,10 +10,10 @@ import os
 import re
 import json
 from PyPDF2 import PdfReader
-from pdfminer3.layout import LAParams
-from pdfminer3.pdfpage import PDFPage
-from pdfminer3.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer3.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
 
 # OCR fallback
 #try:
@@ -1691,3 +1691,4 @@ def run():
 if __name__ == "__main__":
 
     run()
+
