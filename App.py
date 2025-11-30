@@ -15,20 +15,13 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.converter import TextConverter
 
-# OCR fallback
-#try:
- #   import pytesseract
-  #  from PIL import Image as PILImage
-   # from pdf2image import convert_from_path
-    #OCR_AVAILABLE = True
-#except:
- #   OCR_AVAILABLE = False
+# OCR features disabled for deployment
+OCR_AVAILABLE = False
 
 from pyresparser import ResumeParser
 from streamlit_tags import st_tags
 from PIL import Image
-import psycopg2
-import sqlite3  # Fallback database
+import sqlite3  # Using SQLite for deployment
 
 # Import courses - create a simple fallback if Courses.py doesn't exist
 try:
@@ -52,6 +45,13 @@ from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+
+# Download NLTK data if not available - FIX FOR DEPLOYMENT
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords', quiet=True)
+    nltk.download('punkt', quiet=True)
 
 # Download NLTK data quietly
 try:
@@ -138,36 +138,22 @@ SKILLS_IMPROVEMENT = {
 }
 
 # -----------------------------
-# Database setup - UPDATED FOR DEPLOYMENT
+# Database setup - SIMPLIFIED FOR DEPLOYMENT
 # -----------------------------
 DB_NAME = 'CV'
 TABLE_NAME = 'user_data'
 
 def get_db_connection():
     """
-    For deployment: Use PostgreSQL with environment variables
-    For local development: Fallback to SQLite
+    Use SQLite for deployment - no external database needed
     """
     try:
-        # Try to connect to PostgreSQL (for deployment)
-        conn = psycopg2.connect(
-            host=os.environ.get('DB_HOST', 'localhost'),
-            database=os.environ.get('DB_NAME', 'CV'),
-            user=os.environ.get('DB_USER', 'postgres'),
-            password=os.environ.get('DB_PASSWORD', ''),
-            port=os.environ.get('DB_PORT', '5432')
-        )
-        st.sidebar.success("✅ Connected to PostgreSQL")
+        conn = sqlite3.connect('resume_analyzer.db', check_same_thread=False)
+        st.sidebar.success("✅ Connected to SQLite database")
         return conn
     except Exception as e:
-        # Fallback: Use SQLite for local development
-        try:
-            conn = sqlite3.connect('resume_analyzer.db', check_same_thread=False)
-            st.sidebar.info("📁 Using SQLite (local database)")
-            return conn
-        except Exception as sqlite_error:
-            st.sidebar.error("❌ Database connection failed")
-            return None
+        st.sidebar.error(f"❌ Database connection failed: {str(e)}")
+        return None
 
 # Initialize connection
 connection = get_db_connection()
@@ -177,7 +163,7 @@ def init_database():
     if connection:
         try:
             cursor = connection.cursor()
-            # Create table with PostgreSQL/SQLite compatible syntax
+            # Create table with SQLite compatible syntax
             cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1689,6 +1675,4 @@ def run():
         run_career_analytics()
 
 if __name__ == "__main__":
-
     run()
-
