@@ -283,14 +283,42 @@ def extract_text_from_pdf(pdf_file):
         return ""
 
 def show_pdf(file_path):
-    """Display PDF in the app"""
+    """Display PDF in the app with enhanced compatibility"""
     try:
+        # Check if file exists and is readable
+        if not os.path.exists(file_path):
+            st.warning("📄 PDF file not found for preview")
+            return
+            
         with open(file_path, "rb") as f:
             base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
+        
+        # Enhanced PDF display with fallback
+        pdf_display = f'''
+        <div style="border: 2px solid #667eea; border-radius: 10px; padding: 15px; margin: 15px 0; background: rgba(255,255,255,0.1);">
+            <h4 style="color: white; margin-bottom: 10px;">📄 Resume Preview</h4>
+            <iframe src="data:application/pdf;base64,{base64_pdf}" 
+                    width="100%" 
+                    height="600" 
+                    style="border-radius: 8px; border: 1px solid #ddd;"
+                    type="application/pdf">
+            </iframe>
+            <p style="color: #ccc; font-size: 12px; margin-top: 8px; text-align: center;">
+                If PDF doesn't load, your browser may not support embedded PDFs.
+            </p>
+        </div>
+        '''
         st.markdown(pdf_display, unsafe_allow_html=True)
-    except:
-        st.info("📄 PDF preview available in local environment only")
+        
+    except Exception as e:
+        st.warning(f"📄 PDF preview limited: {str(e)}")
+        st.info("""
+        **PDF Preview Note:** 
+        - PDF preview works best in local environments
+        - Cloud deployments may have limited PDF display capabilities  
+        - Your resume analysis will still work perfectly
+        - You can download your resume to view it locally
+        """)
 
 def enhanced_resume_scoring(resume_data, raw_text):
     """Advanced resume scoring system"""
@@ -468,7 +496,7 @@ def video_recommender_with_thumbnails(video_list, key_suffix=""):
     return rec_videos
 
 # -----------------------------
-# User Section
+# User Section (Updated with PDF Preview Fix)
 # -----------------------------
 def run_user_section():
     """Enhanced User Section - Streamlined for deployment"""
@@ -492,11 +520,14 @@ def run_user_section():
             with open(save_path, "wb") as f:
                 f.write(pdf_file.getbuffer())
             
-            # Show PDF preview
+            # FIXED: Show PDF preview with better error handling
+            st.subheader("📄 Resume Preview")
             try:
+                # Try to display PDF
                 show_pdf(save_path)
-            except:
-                st.info("📄 PDF preview available in local environment only")
+            except Exception as pdf_error:
+                st.warning(f"PDF preview not available: {str(pdf_error)}")
+                st.info("You can still analyze the resume content below")
             
             st.markdown("---")
             
@@ -535,7 +566,7 @@ def run_user_section():
                 
         except Exception as e:
             st.error(f"File processing error: {str(e)}")
-            # Ultimate fallback
+            # Ultimate fallback - process without saving file
             try:
                 st.info("🔄 Using basic text analysis...")
                 raw_text = extract_text_from_pdf(pdf_file)
@@ -787,7 +818,7 @@ def skills_improvement_recommendations(resume_skills, career_field):
             st.write(f"📚 {skill}")
 
 # -----------------------------
-# Resume Builder
+# Resume Builder (Updated with Calendar)
 # -----------------------------
 def init_resume_builder_session():
     """Initialize resume builder session state"""
@@ -801,30 +832,6 @@ def init_resume_builder_session():
             'projects': [],
             'certifications': []
         }
-
-def validate_date_format(date_str):
-    """Validate date format MM/YYYY"""
-    if date_str.lower() == 'present':
-        return True
-    try:
-        parts = date_str.split('/')
-        if len(parts) != 2:
-            return False
-        month, year = parts
-        month_num = int(month)
-        year_num = int(year)
-        
-        # Check if month is valid (1-12)
-        if month_num < 1 or month_num > 12:
-            return False
-            
-        # Check if year is reasonable (e.g., 1900-2100)
-        if year_num < 1900 or year_num > 2100:
-            return False
-            
-        return True
-    except ValueError:
-        return False
 
 def calculate_resume_completeness(resume_data):
     """Calculate how complete the resume is"""
@@ -911,7 +918,7 @@ def render_resume_builder():
             height=100
         )
     
-    # Experience
+    # Experience - UPDATED WITH CALENDAR
     with st.expander("💼 Work Experience"):
         st.subheader("Add Work Experience")
         
@@ -921,8 +928,13 @@ def render_resume_builder():
                 company = st.text_input("Company*", key="exp_company")
                 position = st.text_input("Position*", key="exp_position")
             with col2:
-                start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="01/2020", key="exp_start")
-                end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="12/2023 or Present", key="exp_end")
+                # UPDATED: Using date_input instead of text input
+                start_col, end_col = st.columns(2)
+                with start_col:
+                    start_date = st.date_input("Start Date*", key="exp_start")
+                with end_col:
+                    end_date = st.date_input("End Date", key="exp_end")
+                    current_job = st.checkbox("Currently working here", key="current_job")
             
             description = st.text_area("Description*", height=100, placeholder="Describe your responsibilities and achievements...", key="exp_desc")
             
@@ -936,30 +948,23 @@ def render_resume_builder():
                     errors.append("Company name is required")
                 if not position:
                     errors.append("Position is required")
-                if not start_date:
-                    errors.append("Start date is required")
                 if not description:
                     errors.append("Description is required")
-                
-                # Date validation
-                if start_date and start_date.lower() != 'present':
-                    if not validate_date_format(start_date):
-                        errors.append("Start date must be in MM/YYYY format (e.g., 01/2020)")
-                
-                if end_date and end_date.lower() != 'present':
-                    if not validate_date_format(end_date) and end_date.lower() != 'present':
-                        errors.append("End date must be in MM/YYYY format (e.g., 12/2023) or 'Present'")
                 
                 if errors:
                     for error in errors:
                         st.error(f"❌ {error}")
                 else:
+                    # Format dates properly
+                    start_date_str = start_date.strftime("%m/%Y")
+                    end_date_str = "Present" if current_job else end_date.strftime("%m/%Y")
+                    
                     # Add experience to session state
                     st.session_state.resume_data['experience'].append({
                         'company': company,
                         'position': position,
-                        'start_date': start_date,
-                        'end_date': end_date,
+                        'start_date': start_date_str,
+                        'end_date': end_date_str,
                         'description': description
                     })
                     st.success("✅ Experience added successfully!")
@@ -982,7 +987,7 @@ def render_resume_builder():
         else:
             st.info("💡 Add your work experience to build a comprehensive resume")
     
-    # Education Section
+    # Education Section - UPDATED WITH CALENDAR
     with st.expander("🎓 Education"):
         st.subheader("Add Education")
         
@@ -992,8 +997,13 @@ def render_resume_builder():
                 institution = st.text_input("Institution/University*", key="edu_institution")
                 degree = st.text_input("Degree/Certificate*", key="edu_degree")
             with col2:
-                ed_start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="08/2018", key="edu_start")
-                ed_end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="05/2022", key="edu_end")
+                # UPDATED: Using date_input instead of text input
+                edu_start_col, edu_end_col = st.columns(2)
+                with edu_start_col:
+                    ed_start_date = st.date_input("Start Date*", key="edu_start")
+                with edu_end_col:
+                    ed_end_date = st.date_input("End Date", key="edu_end")
+                    current_student = st.checkbox("Currently studying", key="current_student")
             
             ed_description = st.text_area("Description/Achievements", height=100, key="edu_desc", 
                                         placeholder="GPA, honors, relevant coursework, achievements...")
@@ -1008,27 +1018,20 @@ def render_resume_builder():
                     errors.append("Institution name is required")
                 if not degree:
                     errors.append("Degree is required")
-                if not ed_start_date:
-                    errors.append("Start date is required")
-                
-                # Date validation
-                if ed_start_date and ed_start_date.lower() != 'present':
-                    if not validate_date_format(ed_start_date):
-                        errors.append("Start date must be in MM/YYYY format (e.g., 08/2018)")
-                
-                if ed_end_date and ed_end_date.lower() != 'present':
-                    if not validate_date_format(ed_end_date) and ed_end_date.lower() != 'present':
-                        errors.append("End date must be in MM/YYYY format (e.g., 05/2022) or 'Present'")
                 
                 if errors:
                     for error in errors:
                         st.error(f"❌ {error}")
                 else:
+                    # Format dates properly
+                    ed_start_date_str = ed_start_date.strftime("%m/%Y")
+                    ed_end_date_str = "Present" if current_student else ed_end_date.strftime("%m/%Y")
+                    
                     st.session_state.resume_data['education'].append({
                         'institution': institution,
                         'degree': degree,
-                        'start_date': ed_start_date,
-                        'end_date': ed_end_date,
+                        'start_date': ed_start_date_str,
+                        'end_date': ed_end_date_str,
                         'description': ed_description
                     })
                     st.success("✅ Education added successfully!")
@@ -1148,7 +1151,7 @@ def render_resume_builder():
                         st.rerun()
                 st.markdown("---")
     
-    # Resume Preview and Export
+    # Resume Preview and Export - FIXED VISIBILITY
     st.markdown("---")
     st.subheader("👀 Resume Preview")
     
@@ -1166,36 +1169,44 @@ def render_resume_builder():
     with st.expander("📋 Preview Resume Data"):
         st.json(st.session_state.resume_data)
     
-    # Export Options
+    # Export Options - FIXED VISIBILITY
+    st.markdown("---")
     st.subheader("📤 Export Your Resume")
     
-    col1, col2, col3 = st.columns(3)
+    # FIXED: Using columns with proper spacing
+    export_col1, export_col2, export_col3 = st.columns(3)
     
-    with col1:
+    with export_col1:
         if st.button("📄 Generate PDF", use_container_width=True, disabled=not required_fields_filled):
             if required_fields_filled:
-                # Generate and download PDF
-                pdf_content = generate_pdf_resume(st.session_state.resume_data)
-                b64 = base64.b64encode(pdf_content).decode()
-                href = f'<a href="data:application/pdf;base64,{b64}" download="resume_{st.session_state.resume_data["personal_info"]["name"].replace(" ", "_")}.pdf">📥 Download PDF Resume</a>'
-                st.markdown(href, unsafe_allow_html=True)
-                st.success("✅ PDF resume generated successfully!")
+                try:
+                    # Generate and download PDF
+                    pdf_content = generate_pdf_resume(st.session_state.resume_data)
+                    b64 = base64.b64encode(pdf_content).decode()
+                    href = f'<a href="data:application/pdf;base64,{b64}" download="resume_{st.session_state.resume_data["personal_info"]["name"].replace(" ", "_")}.pdf">📥 Download PDF Resume</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+                    st.success("✅ PDF resume generated successfully!")
+                except Exception as e:
+                    st.error(f"❌ Error generating PDF: {str(e)}")
             else:
                 st.warning("Please fill in all required fields first")
     
-    with col2:
+    with export_col2:
         if st.button("📊 Download as JSON", use_container_width=True, disabled=not required_fields_filled):
             if required_fields_filled:
-                # Create download link for JSON
-                json_str = json.dumps(st.session_state.resume_data, indent=2, ensure_ascii=False)
-                b64 = base64.b64encode(json_str.encode()).decode()
-                href = f'<a href="data:file/json;base64,{b64}" download="resume_data.json">📥 Download JSON Resume</a>'
-                st.markdown(href, unsafe_allow_html=True)
-                st.success("✅ Resume data exported as JSON!")
+                try:
+                    # Create download link for JSON
+                    json_str = json.dumps(st.session_state.resume_data, indent=2, ensure_ascii=False)
+                    b64 = base64.b64encode(json_str.encode()).decode()
+                    href = f'<a href="data:file/json;base64,{b64}" download="resume_data.json">📥 Download JSON Resume</a>'
+                    st.markdown(href, unsafe_allow_html=True)
+                    st.success("✅ Resume data exported as JSON!")
+                except Exception as e:
+                    st.error(f"❌ Error generating JSON: {str(e)}")
             else:
                 st.warning("Please fill in all required fields first")
     
-    with col3:
+    with export_col3:
         if st.button("🔄 Reset Form", use_container_width=True):
             st.session_state.resume_data = {
                 'personal_info': {'name': '', 'email': '', 'phone': '', 'linkedin': '', 'github': ''},
