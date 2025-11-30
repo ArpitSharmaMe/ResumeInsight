@@ -1,44 +1,4 @@
-# ResumeInsight Pro - Enhanced Resume Analyzer
-
-# FORCE NLTK DOWNLOAD BEFORE ANY IMPORTS - FIX FOR STREAMLIT CLOUD
-import nltk
-import os
-import tempfile
-
-# Use temp directory for NLTK data in Streamlit Cloud (writable location)
-nltk_data_path = os.path.join(tempfile.gettempdir(), 'nltk_data')
-os.makedirs(nltk_data_path, exist_ok=True)
-
-# Add to NLTK path and set environment variable
-nltk.data.path.append(nltk_data_path)
-os.environ['NLTK_DATA'] = nltk_data_path
-
-# Download required NLTK data with error handling
-try:
-    # Check and download required NLTK datasets
-    required_packages = ['stopwords', 'punkt', 'averaged_perceptron_tagger', 'wordnet']
-    
-    for package in required_packages:
-        try:
-            if package == 'stopwords':
-                nltk.data.find('corpora/stopwords')
-            elif package == 'punkt':
-                nltk.data.find('tokenizers/punkt')
-            elif package == 'averaged_perceptron_tagger':
-                nltk.data.find('taggers/averaged_perceptron_tagger')
-            elif package == 'wordnet':
-                nltk.data.find('corpora/wordnet')
-            print(f"✅ NLTK {package} already available")
-        except LookupError:
-            print(f"📥 Downloading NLTK {package}...")
-            nltk.download(package, download_dir=nltk_data_path, quiet=True)
-    
-    print("✅ All NLTK data ready")
-    
-except Exception as e:
-    print(f"⚠️ NLTK initialization warning: {e}")
-
-# Now import other packages
+# ResumeInsight Pro - Complete Enhanced Resume Analyzer
 import streamlit as st
 import pandas as pd
 import base64
@@ -48,72 +8,12 @@ import datetime
 import io
 import re
 import json
-from PyPDF2 import PdfReader
-from pdfminer.layout import LAParams
-from pdfminer.pdfpage import PDFPage
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.converter import TextConverter
-
-# OCR features disabled for deployment
-OCR_AVAILABLE = False
-
-# FIX FOR SPACY MODEL ERROR
-import spacy
-import subprocess
-import sys
-
-# Set NLTK data path again before importing pyresparser
-nltk.data.path.append(nltk_data_path)
-
-try:
-    # Try to load the spaCy model
-    nlp = spacy.load("en_core_web_sm")
-    print("✅ spaCy model loaded successfully")
-except OSError:
-    print("📥 spaCy model not found, using fallback parsing")
-    nlp = None
-except Exception as e:
-    print(f"⚠️ spaCy model error: {e}")
-    nlp = None
-
-# Safe import for pyresparser with error handling
-try:
-    from pyresparser import ResumeParser
-    print("✅ pyresparser imported successfully")
-except Exception as e:
-    print(f"⚠️ pyresparser import issue: {e}")
-    # Create a mock ResumeParser for fallback
-    class MockResumeParser:
-        def __init__(self, file_path):
-            self.file_path = file_path
-            
-        def get_extracted_data(self):
-            return {
-                'name': '',
-                'email': '',
-                'mobile_number': '',
-                'skills': [],
-                'education': [],
-                'experience': [],
-                'company_names': [],
-                'college_name': '',
-                'designation': '',
-                'total_experience': 0
-            }
-    
-    ResumeParser = MockResumeParser
-    print("⚠️ Using fallback resume parser")
-
-# Import other required packages
-from PIL import Image
 import sqlite3
+import tempfile
+import os
+from PIL import Image
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
 # -----------------------------
@@ -193,43 +93,68 @@ SKILLS_IMPROVEMENT = {
     }
 }
 
-# Import courses - create a simple fallback if Courses.py doesn't exist
-try:
-    from Courses import ds_course, web_course, android_course, ios_course, uiux_course, resume_videos, interview_videos
-except:
-    # Fallback course data
-    ds_course = [("Python for Data Science", "https://www.coursera.org/specializations/data-science-python"), 
-                ("Machine Learning Basics", "https://www.coursera.org/learn/machine-learning"),
-                ("Data Analysis with Python", "https://www.coursera.org/learn/data-analysis-with-python")]
-    web_course = [("Web Development Fundamentals", "https://www.coursera.org/specializations/web-design"),
-                 ("Full Stack Web Development", "https://www.coursera.org/specializations/full-stack-react"),
-                 ("JavaScript Programming", "https://www.coursera.org/specializations/javascript-beginner")]
-    android_course = [("Android Development", "https://www.coursera.org/learn/android-app-development"),
-                     ("Kotlin for Android", "https://www.coursera.org/learn/kotlin-for-android"),
-                     ("Mobile App Development", "https://www.coursera.org/specializations/android-app-development")]
-    ios_course = [("iOS Development with Swift", "https://www.coursera.org/learn/ios-development-swift"),
-                 ("Swift Programming", "https://www.coursera.org/learn/swift-programming"),
-                 ("Mobile App Design", "https://www.coursera.org/learn/mobile-app-design")]
-    uiux_course = [("UI/UX Design", "https://www.coursera.org/specializations/ui-ux-design"),
-                  ("Interaction Design", "https://www.coursera.org/learn/interaction-design"),
-                  ("User Research", "https://www.coursera.org/learn/user-research")]
-    resume_videos = [("How to write a great resume", "https://youtube.com/watch?v=BYUyjn3fhV4"),
-                    ("Resume tips for 2024", "https://youtube.com/watch?v=9hdz2i6e1yw"),
-                    ("ATS Resume Guide", "https://youtube.com/watch?v=6tZfp8l7l_s")]
-    interview_videos = [("Interview preparation tips", "https://youtube.com/watch?v=HG68Ymazo18"),
-                       ("Technical Interview Guide", "https://youtube.com/watch?v=1qw5ITr3k9E"),
-                       ("Behavioral Interview Questions", "https://youtube.com/watch?v=PJm6kdkKG94")]
+# Fallback course data
+ds_course = [
+    ("Python for Data Science", "https://www.coursera.org/specializations/data-science-python"), 
+    ("Machine Learning Basics", "https://www.coursera.org/learn/machine-learning"),
+    ("Data Analysis with Python", "https://www.coursera.org/learn/data-analysis-with-python"),
+    ("Data Visualization", "https://www.coursera.org/learn/data-visualization"),
+    ("SQL for Data Science", "https://www.coursera.org/learn/sql-for-data-science")
+]
+
+web_course = [
+    ("Web Development Fundamentals", "https://www.coursera.org/specializations/web-design"),
+    ("Full Stack Web Development", "https://www.coursera.org/specializations/full-stack-react"),
+    ("JavaScript Programming", "https://www.coursera.org/specializations/javascript-beginner"),
+    ("HTML & CSS", "https://www.coursera.org/learn/html-css-javascript-for-web-developers"),
+    ("React Development", "https://www.coursera.org/learn/react-basics")
+]
+
+android_course = [
+    ("Android Development", "https://www.coursera.org/learn/android-app-development"),
+    ("Kotlin for Android", "https://www.coursera.org/learn/kotlin-for-android"),
+    ("Mobile App Development", "https://www.coursera.org/specializations/android-app-development"),
+    ("Android Studio", "https://www.coursera.org/learn/android-app"),
+    ("Mobile UI/UX", "https://www.coursera.org/learn/mobile-design")
+]
+
+ios_course = [
+    ("iOS Development with Swift", "https://www.coursera.org/learn/ios-development-swift"),
+    ("Swift Programming", "https://www.coursera.org/learn/swift-programming"),
+    ("Mobile App Design", "https://www.coursera.org/learn/mobile-app-design"),
+    ("Apple Developer Course", "https://developer.apple.com/learn/"),
+    ("iOS UI Development", "https://www.coursera.org/learn/ios-ui")
+]
+
+uiux_course = [
+    ("UI/UX Design", "https://www.coursera.org/specializations/ui-ux-design"),
+    ("Interaction Design", "https://www.coursera.org/learn/interaction-design"),
+    ("User Research", "https://www.coursera.org/learn/user-research"),
+    ("Figma for Beginners", "https://www.coursera.org/learn/figma-design"),
+    ("Design Thinking", "https://www.coursera.org/learn/design-thinking-innovation")
+]
+
+resume_videos = [
+    ("How to write a great resume", "https://youtube.com/watch?v=BYUyjn3fhV4"),
+    ("Resume tips for 2024", "https://youtube.com/watch?v=9hdz2i6e1yw"),
+    ("ATS Resume Guide", "https://youtube.com/watch?v=6tZfp8l7l_s"),
+    ("Resume formatting tips", "https://youtube.com/watch?v=6Sf7g2s-1C4"),
+    ("Resume mistakes to avoid", "https://youtube.com/watch?v=GjT-os4p9oY")
+]
+
+interview_videos = [
+    ("Interview preparation tips", "https://youtube.com/watch?v=HG68Ymazo18"),
+    ("Technical Interview Guide", "https://youtube.com/watch?v=1qw5ITr3k9E"),
+    ("Behavioral Interview Questions", "https://youtube.com/watch?v=PJm6kdkKG94"),
+    ("How to answer 'Tell me about yourself'", "https://youtube.com/watch?v=KMLsx-2cbls"),
+    ("Salary negotiation tips", "https://youtube.com/watch?v=X_sULu2b1_8")
+]
 
 # -----------------------------
-# Database setup - SIMPLIFIED FOR DEPLOYMENT
+# Database Setup (SQLite)
 # -----------------------------
-DB_NAME = 'CV'
-TABLE_NAME = 'user_data'
-
 def get_db_connection():
-    """
-    Use SQLite for deployment - no external database needed
-    """
+    """Use SQLite for deployment"""
     try:
         conn = sqlite3.connect('resume_analyzer.db', check_same_thread=False)
         return conn
@@ -237,7 +162,6 @@ def get_db_connection():
         st.sidebar.error(f"❌ Database connection failed: {str(e)}")
         return None
 
-# Initialize connection
 connection = get_db_connection()
 
 def init_database():
@@ -245,8 +169,8 @@ def init_database():
     if connection:
         try:
             cursor = connection.cursor()
-            cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_data (
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 Name VARCHAR(500),
                 Email_ID VARCHAR(500),
@@ -263,7 +187,6 @@ def init_database():
         except Exception as e:
             st.sidebar.warning(f"Database init warning: {str(e)}")
 
-# Initialize database on startup
 init_database()
 
 def insert_data(name, email, res_score, timestamp, no_of_pages, reco_field, cand_level, skills, recommended_skills, courses):
@@ -271,8 +194,8 @@ def insert_data(name, email, res_score, timestamp, no_of_pages, reco_field, cand
     if connection:
         try:
             cursor = connection.cursor()
-            cursor.execute(f"""
-            INSERT INTO {TABLE_NAME} 
+            cursor.execute("""
+            INSERT INTO user_data 
             (Name, Email_ID, resume_score, Timestamp, Page_no, Predicted_Field, User_level, Actual_skills, Recommended_skills, Recommended_courses) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (name, email, str(res_score), timestamp, str(no_of_pages), reco_field, cand_level, skills, recommended_skills, courses))
@@ -284,143 +207,96 @@ def insert_data(name, email, res_score, timestamp, no_of_pages, reco_field, cand
     return False
 
 # -----------------------------
-# IMPROVED PDF VIEWING FUNCTION
+# Core Helper Functions
 # -----------------------------
+def extract_email(text):
+    """Extract email from text"""
+    m = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}", text)
+    return m.group(0) if m else None
+
+def extract_phone(text):
+    """Extract phone number from text"""
+    m = re.search(r'(\+?\d[\d\s\-\(\)]{7,}\d)', text)
+    return m.group(0).strip() if m else None
+
+def extract_skills_from_text(text):
+    """Extract skills from resume text"""
+    known_skills = {
+        'python','java','c++','c#','javascript','react','angular','django','flask',
+        'tensorflow','pytorch','keras','sql','mysql','postgresql','nosql','mongodb',
+        'excel','git','docker','kubernetes','aws','azure','gcp','html','css','php',
+        'android','kotlin','swift','flutter','figma','photoshop','linux','bash','rest api',
+        'pandas','numpy','scikit-learn','opencv','nlp','tableau','power bi', 'machine learning',
+        'deep learning','data analysis','data visualization','web development','mobile development',
+        'ui/ux','agile','scrum','project management','leadership','communication','teamwork'
+    }
+    
+    text_lower = text.lower()
+    skills = set()
+    
+    # Look for skills section
+    header_pat = re.compile(r'(?P<header>(skills|technical skills|hard skills|skillset|skills & technologies))[:\n\r]*', re.IGNORECASE)
+    for m in header_pat.finditer(text):
+        start = m.end()
+        block = text[start:start+800]
+        bullets = re.findall(r'[\u2022\-\*\•]\s*([^\n\r]+)', block)
+        if not bullets:
+            candidates = re.split(r'[,;\n\r]', block)
+            bullets = [c.strip() for c in candidates if len(c.strip())>1][:40]
+        for b in bullets:
+            for token in re.split(r'[\/,\|\-–]', b):
+                token = token.strip()
+                if not token:
+                    continue
+                token_low = token.lower()
+                if token_low in known_skills:
+                    skills.add(token.strip())
+                else:
+                    for ks in known_skills:
+                        if ks in token_low:
+                            skills.add(ks.capitalize())
+        if skills:
+            return sorted(skills)
+    
+    # Fallback: search for known skills in entire text
+    for ks in known_skills:
+        if ks in text_lower:
+            skills.add(ks.capitalize())
+    return sorted(skills)
+
+def extract_text_from_pdf(pdf_file):
+    """Extract text from PDF using PyPDF2"""
+    try:
+        from PyPDF2 import PdfReader
+        if hasattr(pdf_file, 'read'):
+            # It's a file-like object
+            reader = PdfReader(pdf_file)
+        else:
+            # It's a file path
+            reader = PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += (page.extract_text() or "") + "\n"
+        return text
+    except Exception as e:
+        st.warning(f"PDF text extraction limited: {str(e)}")
+        return ""
+
 def show_pdf(file_path):
-    """Enhanced PDF viewing function with better error handling"""
+    """Display PDF in the app"""
     try:
         with open(file_path, "rb") as f:
             base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-        
-        # Create a more robust PDF display
-        pdf_display = f'''
-        <div style="border: 2px solid #667eea; border-radius: 10px; padding: 10px; margin: 10px 0;">
-            <h4 style="color: #667eea; margin-bottom: 10px;">📄 Resume Preview</h4>
-            <iframe src="data:application/pdf;base64,{base64_pdf}" 
-                    width="100%" 
-                    height="800" 
-                    style="border: none; border-radius: 5px;">
-            </iframe>
-            <p style="text-align: center; margin-top: 10px; color: #666;">
-                If PDF doesn't load, <a href="data:application/pdf;base64,{base64_pdf}" download="resume.pdf">download it here</a>
-            </p>
-        </div>
-        '''
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="700" height="1000" type="application/pdf"></iframe>'
         st.markdown(pdf_display, unsafe_allow_html=True)
-        return True
-    except Exception as e:
-        st.error(f"❌ Error displaying PDF: {str(e)}")
-        
-        # Alternative PDF display method
-        try:
-            st.info("🔄 Trying alternative PDF display...")
-            with open(file_path, "rb") as f:
-                base64_pdf = base64.b64encode(f.read()).decode()
-            
-            href = f'<a href="data:application/pdf;base64,{base64_pdf}" download="resume.pdf" style="background-color: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">📥 Download Resume PDF</a>'
-            st.markdown(href, unsafe_allow_html=True)
-            return True
-        except:
-            st.error("❌ Could not display or download PDF. The file might be corrupted or in an unsupported format.")
-            return False
+    except:
+        st.info("📄 PDF preview available in local environment only")
 
-# -----------------------------
-# IMPROVED TEXT EXTRACTION FUNCTIONS
-# -----------------------------
-def extract_text_pypdf2(pdf_path_or_file):
-    """Enhanced PDF text extraction with PyPDF2"""
-    try:
-        if hasattr(pdf_path_or_file, 'read'):
-            # It's a file-like object
-            reader = PdfReader(pdf_path_or_file)
-        else:
-            # It's a file path
-            reader = PdfReader(pdf_path_or_file)
-        
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-        
-        return text.strip()
-    except Exception as e:
-        st.warning(f"PyPDF2 extraction warning: {str(e)}")
-        return ""
-
-def pdfminer_extract_text(file_path):
-    """Enhanced PDF text extraction with pdfminer"""
-    try:
-        resource_manager = PDFResourceManager()
-        fake_file_handle = io.StringIO()
-        
-        converter = TextConverter(
-            resource_manager, 
-            fake_file_handle, 
-            laparams=LAParams(
-                line_margin=0.5,
-                word_margin=0.1,
-                char_margin=2.0,
-                boxes_flow=0.5
-            )
-        )
-        
-        page_interpreter = PDFPageInterpreter(resource_manager, converter)
-        
-        with open(file_path, 'rb') as fh:
-            for page in PDFPage.get_pages(fh, caching=True, check_extractable=True):
-                page_interpreter.process_page(page)
-        
-        text = fake_file_handle.getvalue()
-        converter.close()
-        fake_file_handle.close()
-        
-        return text.strip()
-    except Exception as e:
-        st.warning(f"PDFMiner extraction warning: {str(e)}")
-        return ""
-
-def extract_text_from_pdf(file_path):
-    """Comprehensive PDF text extraction with fallbacks"""
-    # Try pdfminer first (better for complex layouts)
-    text = pdfminer_extract_text(file_path)
-    
-    # If pdfminer fails or returns little text, try PyPDF2
-    if not text or len(text.strip()) < 50:
-        text = extract_text_pypdf2(file_path)
-    
-    # If both fail, try with different parameters
-    if not text or len(text.strip()) < 50:
-        try:
-            # Last resort: simple PyPDF2 with error handling
-            reader = PdfReader(file_path)
-            text = ""
-            for page in reader.pages:
-                try:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-                except:
-                    continue
-        except:
-            pass
-    
-    return text if text else ""
-
-# -----------------------------
-# IMPROVED RESUME SCORING SYSTEM
-# -----------------------------
 def enhanced_resume_scoring(resume_data, raw_text):
-    """
-    Advanced resume scoring with multiple factors
-    IMPROVED: Better section detection and scoring
-    """
+    """Advanced resume scoring system"""
     score = 0
     max_score = 100
     feedback = []
-    
-    # Convert text to lowercase for easier matching
-    text_lower = raw_text.lower()
     
     # 1. Contact Information (15 points)
     contact_score = 0
@@ -436,90 +312,35 @@ def enhanced_resume_scoring(resume_data, raw_text):
     score += skills_score
     feedback.append(f"✅ Skills: {skills_score}/20 points ({len(skills)} skills found)")
     
-    # 3. Experience (25 points) - IMPROVED DETECTION
+    # 3. Experience (25 points)
     experience_score = 0
     experience = resume_data.get('experience', [])
-    
-    # Check both parsed experience and text patterns
-    experience_indicators = [
-        'experience', 'work history', 'employment', 'professional experience',
-        'career', 'work experience', 'employment history'
-    ]
-    
-    has_experience_section = any(indicator in text_lower for indicator in experience_indicators)
-    has_experience_content = len(experience) > 0
-    
-    if has_experience_content:
+    if experience:
         experience_score = min(len(experience) * 5, 25)
-    elif has_experience_section:
-        experience_score = 15  # Partial credit for having section
-    elif any(word in text_lower for word in ['company', 'worked', 'job', 'position', 'role']):
-        experience_score = 10  # Minor credit for experience keywords
-    
     score += experience_score
     feedback.append(f"✅ Experience: {experience_score}/25 points")
     
-    # 4. Education (15 points) - IMPROVED DETECTION
+    # 4. Education (15 points)
     education_score = 0
     education = resume_data.get('education', [])
-    
-    # Education indicators
-    education_indicators = [
-        'education', 'academic', 'qualification', 'degree', 'university',
-        'college', 'school', 'bachelor', 'master', 'phd', 'diploma', 'certificate'
-    ]
-    
-    has_education_section = any(indicator in text_lower for indicator in education_indicators)
-    has_education_content = len(education) > 0
-    
-    if has_education_content:
+    if education:
         education_score = min(len(education) * 5, 15)
-    elif has_education_section:
-        education_score = 10  # Partial credit for having section
-    elif any(word in text_lower for word in ['university', 'college', 'degree', 'bachelor', 'master']):
-        education_score = 8  # Minor credit for education keywords
-    
     score += education_score
     feedback.append(f"✅ Education: {education_score}/15 points")
     
-    # 5. ATS Optimization (25 points) - IMPROVED
+    # 5. ATS Optimization (25 points)
     ats_score = 0
-    
-    # Check for important sections
-    important_sections = ['experience', 'education', 'skills', 'project', 'certification', 'summary', 'objective']
+    text_lower = raw_text.lower()
+    important_sections = ['experience', 'education', 'skills', 'project', 'certification']
     found_sections = [section for section in important_sections if section in text_lower]
     ats_score += min(len(found_sections) * 3, 15)
     
-    # Check for action verbs (more comprehensive list)
-    action_verbs = [
-        'managed', 'developed', 'implemented', 'led', 'created', 'optimized',
-        'improved', 'achieved', 'coordinated', 'organized', 'planned', 'executed',
-        'analyzed', 'designed', 'built', 'maintained', 'increased', 'reduced',
-        'saved', 'generated', 'resolved', 'trained', 'mentored', 'supervised'
-    ]
+    action_verbs = ['managed', 'developed', 'implemented', 'led', 'created', 'optimized', 'achieved', 'improved']
     found_verbs = [verb for verb in action_verbs if verb in text_lower]
     ats_score += min(len(found_verbs) * 2, 10)
     
     score += ats_score
     feedback.append(f"✅ ATS Optimization: {ats_score}/25 points")
-    
-    # 6. Additional scoring factors
-    additional_score = 0
-    
-    # Check for quantifiable achievements
-    achievement_indicators = ['%', 'percent', 'increased', 'decreased', 'reduced', 'saved', 'improved']
-    if any(indicator in text_lower for indicator in achievement_indicators):
-        additional_score += 5
-        feedback.append("⭐ Quantifiable achievements found")
-    
-    # Check for technical skills density
-    technical_terms = ['python', 'java', 'javascript', 'sql', 'html', 'css', 'react', 'angular', 'node']
-    tech_skills_found = [term for term in technical_terms if term in text_lower]
-    if len(tech_skills_found) >= 3:
-        additional_score += 5
-        feedback.append(f"⭐ Strong technical skills ({len(tech_skills_found)} found)")
-    
-    score += additional_score
     
     # Determine grade
     if score >= 90:
@@ -534,12 +355,9 @@ def enhanced_resume_scoring(resume_data, raw_text):
     elif score >= 60:
         grade = "B"
         color = "#e67e22"
-    elif score >= 50:
-        grade = "C+"
-        color = "#e74c3c"
     else:
         grade = "C"
-        color = "#c0392b"
+        color = "#e74c3c"
     
     return {
         'total_score': score,
@@ -551,113 +369,109 @@ def enhanced_resume_scoring(resume_data, raw_text):
             'skills': skills_score,
             'experience': experience_score,
             'education': education_score,
-            'ats': ats_score,
-            'additional': additional_score
+            'ats': ats_score
         }
     }
 
-# -----------------------------
-# IMPROVED RESUME PARSING
-# -----------------------------
-def extract_skills_from_text(text, known_skills=None):
-    """Enhanced skills extraction"""
-    if known_skills is None:
-        known_skills = {
-            'python','java','c++','c#','javascript','react','angular','vue','django','flask',
-            'tensorflow','pytorch','keras','scikit-learn','sql','mysql','postgresql','nosql','mongodb',
-            'excel','git','docker','kubernetes','aws','azure','gcp','html','css','php',
-            'android','kotlin','swift','flutter','figma','photoshop','linux','bash','rest api',
-            'pandas','numpy','matplotlib','seaborn','opencv','nlp','tableau','power bi','jira'
-        }
-    
-    text_lower = text.lower()
-    skills = set()
-    
-    # Method 1: Look for skills section
-    header_patterns = [
-        r'(?:skills|technical skills|hard skills|skillset|skills & technologies|technical competencies)[:\n\r]*',
-        r'(?:programming languages|technologies|tools)[:\n\r]*'
-    ]
-    
-    for pattern in header_patterns:
-        header_pat = re.compile(pattern, re.IGNORECASE)
-        for m in header_pat.finditer(text):
-            start = m.end()
-            # Extract next 1000 characters after skills header
-            block = text[start:start+1000]
-            
-            # Look for bullet points or comma-separated skills
-            bullets = re.findall(r'[\u2022\-\*\•]\s*([^\n\r]+)', block)
-            if not bullets:
-                # Try comma separation
-                candidates = re.split(r'[,;\n\r]', block)
-                bullets = [c.strip() for c in candidates if len(c.strip()) > 1][:30]
-            
-            for b in bullets:
-                # Split by common separators
-                for token in re.split(r'[\/,\|\-–]', b):
-                    token = token.strip()
-                    if not token:
-                        continue
-                    token_low = token.lower()
-                    
-                    # Exact match
-                    if token_low in known_skills:
-                        skills.add(token.strip())
-                    else:
-                        # Partial match
-                        for ks in known_skills:
-                            if ks in token_low:
-                                skills.add(ks.capitalize())
-    
-    # Method 2: Scan entire text for known skills
-    for skill in known_skills:
-        if skill in text_lower:
-            # Check if it's not part of another word
-            pattern = r'\b' + re.escape(skill) + r'\b'
-            if re.search(pattern, text_lower):
-                skills.add(skill.capitalize())
-    
-    return sorted(skills)
+def course_recommender(course_list, key_suffix=""):
+    """Course recommendation system"""
+    st.subheader("**Courses & Certificates Recommendations 🎓**")
+    rec_course = []
+    no_of_reco = st.slider('Choose Number of Course Recommendations:', 1, 10, 5, key=f"course_slider_{key_suffix}")
+    copy_courses = course_list[:]
+    random.shuffle(copy_courses)
+    for idx, (c_name, c_link) in enumerate(copy_courses, start=1):
+        st.markdown(f"({idx}) [{c_name}]({c_link})")
+        rec_course.append(c_name)
+        if idx == no_of_reco:
+            break
+    return rec_course
 
-def extract_email(text):
-    """Enhanced email extraction"""
+def get_table_download_link(df, filename, text):
+    """Generate download link for dataframe"""
+    csv = df.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()
+    return f'<a href="data:file/csv;base64,{b64}" download="{filename}">{text}</a>'
+
+def extract_video_id(youtube_url):
+    """Extract YouTube video ID from URL"""
     patterns = [
-        r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,}',
-        r'Email[:\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,})',
-        r'E-mail[:\s]*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Z|a-z]{2,})'
+        r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\n]+)',
+        r'youtube\.com\/embed\/([^&?\n]+)',
+        r'youtube\.com\/v\/([^&?\n]+)'
     ]
-    
     for pattern in patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            email = match.group(1) if len(match.groups()) > 0 else match.group(0)
-            if email and '@' in email:
-                return email.strip()
+        match = re.search(pattern, youtube_url)
+        if match:
+            return match.group(1)
     return None
 
-def extract_phone(text):
-    """Enhanced phone number extraction"""
-    patterns = [
-        r'(\+?\d[\d\s\-\(\)]{7,}\d)',
-        r'Phone[:\s]*([+\d\s\-\(\)]{10,})',
-        r'Mobile[:\s]*([+\d\s\-\(\)]{10,})',
-        r'Contact[:\s]*([+\d\s\-\(\)]{10,})'
-    ]
+def get_youtube_thumbnail(video_id):
+    """Get YouTube thumbnail URL"""
+    return f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+
+def video_recommender_with_thumbnails(video_list, key_suffix=""):
+    """Video recommendation with thumbnails"""
+    st.subheader("**🎥 Recommended Videos**")
+    rec_videos = []
+    no_of_reco = st.slider('Choose Number of Video Recommendations:', 1, 10, 4, key=f"video_slider_{key_suffix}")
+    copy_videos = video_list[:]
+    random.shuffle(copy_videos)
     
-    for pattern in patterns:
-        matches = re.finditer(pattern, text, re.IGNORECASE)
-        for match in matches:
-            phone = match.group(1) if len(match.groups()) > 0 else match.group(0)
-            if phone and len(re.sub(r'\D', '', phone)) >= 10:
-                return phone.strip()
-    return None
+    for idx, video_item in enumerate(copy_videos, start=1):
+        try:
+            if isinstance(video_item, tuple) and len(video_item) == 2:
+                v_name, v_link = video_item
+            elif isinstance(video_item, str):
+                v_link = video_item
+                v_name = f"Video {idx}"
+            elif isinstance(video_item, dict):
+                v_name = video_item.get('name', video_item.get('title', 'Video'))
+                v_link = video_item.get('link', video_item.get('url', '#'))
+            else:
+                v_name = f"Video {idx}"
+                v_link = "#"
+            
+            video_id = extract_video_id(v_link)
+            
+            if video_id:
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    thumbnail_url = get_youtube_thumbnail(video_id)
+                    st.markdown(
+                        f"""
+                        <div style="position: relative; cursor: pointer;" onclick="window.open('{v_link}', '_blank')">
+                            <img src="{thumbnail_url}" style="width: 100%; border-radius: 8px; border: 2px solid #667eea;">
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                      background: rgba(0,0,0,0.7); border-radius: 50%; width: 50px; height: 50px; 
+                                      display: flex; align-items: center; justify-content: center;">
+                                <span style="color: white; font-size: 20px;">▶</span>
+                            </div>
+                        </div>
+                        """, 
+                        unsafe_allow_html=True
+                    )
+                with col2:
+                    st.markdown(f"### {v_name}")
+                    st.markdown(f"*Click to watch this video*")
+                    st.markdown(f"[Open in YouTube]({v_link})")
+            else:
+                st.markdown(f"({idx}) [{v_name}]({v_link})")
+            
+            rec_videos.append(v_name)
+            if idx == no_of_reco:
+                break
+            st.markdown("---")
+        except Exception as e:
+            st.warning(f"Could not process video: {str(e)}")
+            continue
+    return rec_videos
 
 # -----------------------------
-# IMPROVED USER SECTION
+# User Section
 # -----------------------------
 def run_user_section():
-    """Enhanced User Section with FIXED PDF viewing and scoring"""
+    """Enhanced User Section - Streamlined for deployment"""
     
     st.subheader("👤 Resume Analysis")
     user_name = st.text_input("Full Name", placeholder="Enter your full name")
@@ -678,71 +492,53 @@ def run_user_section():
             with open(save_path, "wb") as f:
                 f.write(pdf_file.getbuffer())
             
-            st.success(f"✅ Resume uploaded successfully: {pdf_file.name}")
-            
-            # Display PDF with improved function
-            st.markdown("---")
-            st.subheader("📄 Resume Preview")
-            pdf_displayed = show_pdf(save_path)
-            
-            if not pdf_displayed:
-                st.info("💡 If PDF preview doesn't work, you can still analyze the resume content below.")
+            # Show PDF preview
+            try:
+                show_pdf(save_path)
+            except:
+                st.info("📄 PDF preview available in local environment only")
             
             st.markdown("---")
-            st.subheader("🔍 Resume Analysis Results")
             
-            # Show loading animation during analysis
-            with st.spinner("Analyzing your resume... This may take a few seconds."):
-                # Resume Analysis with improved text extraction
-                resume_data = {}
-                raw_text = ""
+            # Process the uploaded file
+            with st.spinner("Analyzing your resume..."):
+                # Extract text from PDF
+                raw_text = extract_text_from_pdf(pdf_file)
                 
-                # Extract text with improved function
-                raw_text = extract_text_from_pdf(save_path)
-                
-                if not raw_text or len(raw_text.strip()) < 50:
-                    st.error("❌ Could not extract sufficient text from the PDF. The file might be scanned or corrupted.")
-                    st.info("💡 Try uploading a PDF with selectable text, not a scanned image.")
+                if not raw_text.strip():
+                    st.error("❌ Could not extract text from PDF. Please try a different file.")
                     return
                 
-                # Show extracted text preview (collapsed)
-                with st.expander("📝 View Extracted Text (Preview)"):
-                    st.text_area("", raw_text[:1000] + "..." if len(raw_text) > 1000 else raw_text, height=200)
-                
-                # Try advanced parsing first
+                # Extract page count
                 try:
-                    resume_data = ResumeParser(save_path).get_extracted_data()
-                    st.success("✅ Advanced resume parsing completed")
-                except Exception as e:
-                    st.warning(f"⚠️ Advanced parsing limited: {str(e)}")
-                    resume_data = {}
-                
-                # Enhanced data extraction with fallbacks
-                resume_data['email'] = resume_data.get('email') or extract_email(raw_text)
-                resume_data['mobile_number'] = resume_data.get('mobile_number') or extract_phone(raw_text)
-                resume_data['skills'] = resume_data.get('skills') or extract_skills_from_text(raw_text)
-                resume_data['name'] = user_name
-
-                # Get page count
-                try:
-                    p_reader = PdfReader(save_path)
+                    from PyPDF2 import PdfReader
+                    p_reader = PdfReader(pdf_file)
                     no_of_pages = len(p_reader.pages)
                 except:
                     no_of_pages = 1
-
-                # Enhanced Resume Scoring with improved algorithm
+                
+                # Extract resume data
+                resume_data = {
+                    'name': user_name,
+                    'email': extract_email(raw_text),
+                    'mobile_number': extract_phone(raw_text),
+                    'skills': extract_skills_from_text(raw_text),
+                    'experience': [],
+                    'education': []
+                }
+                
+                # Enhanced Resume Scoring
                 enhanced_score = enhanced_resume_scoring(resume_data, raw_text)
                 
                 # Display Results
-                display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages, pdf_file.name)
-            
+                display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages)
+                
         except Exception as e:
-            st.error(f"❌ File processing error: {str(e)}")
-            
-            # Ultimate fallback with basic text analysis
+            st.error(f"File processing error: {str(e)}")
+            # Ultimate fallback
             try:
                 st.info("🔄 Using basic text analysis...")
-                raw_text = extract_text_pypdf2(pdf_file)
+                raw_text = extract_text_from_pdf(pdf_file)
                 if not raw_text.strip():
                     raw_text = ""
                 
@@ -758,73 +554,20 @@ def run_user_section():
                 
                 no_of_pages = 1
                 enhanced_score = enhanced_resume_scoring(resume_data, raw_text)
-                display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages, pdf_file.name)
+                display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages)
                 
             except Exception as parse_error:
-                st.error(f"❌ Error analyzing resume: {str(parse_error)}")
+                st.error(f"Error analyzing resume: {str(parse_error)}")
                 st.info("💡 Try uploading a different PDF file or check the file format")
 
-def determine_experience_level(resume_data, raw_text):
-    """Improved experience level detection"""
-    text_lower = raw_text.lower()
-    
-    # Check for seniority indicators
-    senior_indicators = [
-        'senior', 'lead', 'principal', 'manager', 'director', 'head of',
-        'architect', 'strategist', '10+ years', '15+ years', '20+ years'
-    ]
-    
-    mid_indicators = [
-        'mid-level', 'mid level', '3+ years', '5+ years', '7+ years',
-        'experienced', 'specialist', 'consultant'
-    ]
-    
-    junior_indicators = [
-        'junior', 'entry', 'graduate', 'fresher', '0-2 years', '1-2 years',
-        'intern', 'trainee', 'associate'
-    ]
-    
-    senior_count = sum(1 for indicator in senior_indicators if indicator in text_lower)
-    mid_count = sum(1 for indicator in mid_indicators if indicator in text_lower)
-    junior_count = sum(1 for indicator in junior_indicators if indicator in text_lower)
-    
-    if senior_count > mid_count and senior_count > junior_count:
-        return "Senior Level (8+ years experience)"
-    elif mid_count > junior_count:
-        return "Mid Level (3-7 years experience)"
-    elif junior_count > 0:
-        return "Entry Level (0-2 years experience)"
-    else:
-        # Fallback to page count
-        experience = resume_data.get('experience', [])
-        if len(experience) >= 3:
-            return "Experienced Professional"
-        elif len(experience) >= 1:
-            return "Developing Professional"
-        else:
-            return "Fresher / Entry Level"
-
-def get_level_color(level):
-    """Get color for experience level"""
-    color_map = {
-        "Senior Level": "#e74c3c",
-        "Mid Level": "#f39c12", 
-        "Experienced Professional": "#3498db",
-        "Developing Professional": "#2ecc71",
-        "Entry Level": "#27ae60",
-        "Fresher": "#95a5a6"
-    }
-    return color_map.get(level, "#667eea")
-
-def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages, filename):
-    """Display enhanced analysis results with improved scoring"""
-    
+def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages):
+    """Display enhanced analysis results"""
     # Personal Information Card
     st.markdown(
         f"""
         <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; border-left: 4px solid #667eea; margin: 10px 0; color: white;">
             <h3>👋 Hello {resume_data['name']}</h3>
-            <p><strong>Resume:</strong> {filename}</p>
+            <p><strong>Name:</strong> {resume_data['name']}</p>
             <p><strong>Email:</strong> {resume_data.get('email', 'Not Found')}</p>
             <p><strong>Contact:</strong> {resume_data.get('mobile_number', 'Not Found')}</p>
             <p><strong>Resume Pages:</strong> {no_of_pages}</p>
@@ -833,15 +576,24 @@ def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages,
         unsafe_allow_html=True
     )
 
-    # Candidate level based on content analysis
-    cand_level = determine_experience_level(resume_data, raw_text)
-    level_color = get_level_color(cand_level)
+    # Candidate level
+    cand_level = ''
+    level_color = ''
+    if no_of_pages == 1:
+        cand_level = "Fresher"
+        level_color = "#ff6b6b"
+    elif no_of_pages == 2:
+        cand_level = "Intermediate"
+        level_color = "#4ecdc4"
+    elif no_of_pages >= 3:
+        cand_level = "Experienced"
+        level_color = "#45b7d1"
     
     st.markdown(
         f"""
         <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); margin: 10px 0; color: white;">
-            <h3>🎯 Experience Level Analysis</h3>
-            <h4 style='color: {level_color};'>{cand_level}</h4>
+            <h3>🎯 Experience Level</h3>
+            <h4 style='color: {level_color};'>You are at {cand_level} level!</h4>
         </div>
         """, 
         unsafe_allow_html=True
@@ -858,16 +610,17 @@ def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages,
         unsafe_allow_html=True
     )
     
+    # Display skills as chips
     if skills_list:
-        # Display skills in a grid
-        cols = st.columns(3)
-        for i, skill in enumerate(skills_list):
-            with cols[i % 3]:
-                st.markdown(f"<div style='background-color: #667eea; color: white; padding: 8px; margin: 4px; border-radius: 10px; text-align: center;'>{skill}</div>", unsafe_allow_html=True)
+        skills_html = "<div style='margin-bottom: 20px;'>"
+        for skill in skills_list:
+            skills_html += f"<span style='background-color: #667eea; color: white; padding: 8px 16px; margin: 4px; border-radius: 20px; display: inline-block; font-size: 14px;'>{skill}</span>"
+        skills_html += "</div>"
+        st.markdown(skills_html, unsafe_allow_html=True)
     else:
-        st.info("No skills detected. Try adding a clear 'Skills' section to your resume with bullet points.")
+        st.info("No skills detected. Try adding a 'Skills' section to your resume.")
 
-    # Enhanced Resume Score with detailed breakdown
+    # Enhanced Resume Score
     st.markdown(
         f"""
         <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); margin: 10px 0; color: white;">
@@ -878,55 +631,25 @@ def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages,
         unsafe_allow_html=True
     )
 
-    # Score Breakdown with improved metrics
-    col1, col2, col3 = st.columns(3)
+    # Score Breakdown
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.metric("Contact Info", f"{enhanced_score['breakdown']['contact']}/15")
-        st.metric("Skills", f"{enhanced_score['breakdown']['skills']}/20")
     with col2:
-        st.metric("Experience", f"{enhanced_score['breakdown']['experience']}/25")
-        st.metric("Education", f"{enhanced_score['breakdown']['education']}/15")
+        st.metric("Skills", f"{enhanced_score['breakdown']['skills']}/20")
     with col3:
+        st.metric("Experience", f"{enhanced_score['breakdown']['experience']}/25")
+    with col4:
+        st.metric("Education", f"{enhanced_score['breakdown']['education']}/15")
+    with col5:
         st.metric("ATS Optimization", f"{enhanced_score['breakdown']['ats']}/25")
-        if enhanced_score['breakdown']['additional'] > 0:
-            st.metric("Bonus Points", f"+{enhanced_score['breakdown']['additional']}")
 
     # Progress bar for overall score
-    st.markdown("**Overall Score Progress:**")
     my_bar = st.progress(0)
-    for i in range(enhanced_score['total_score'] + 1):
+    for i in range(enhanced_score['total_score']):
         time.sleep(0.01)
-        my_bar.progress(i)
+        my_bar.progress(i + 1)
 
-    # Detailed Feedback
-    with st.expander("📋 Detailed Analysis Feedback", expanded=True):
-        for feedback_item in enhanced_score['feedback']:
-            if "✅" in feedback_item:
-                st.success(feedback_item)
-            elif "⭐" in feedback_item:
-                st.info(feedback_item)
-            else:
-                st.write(feedback_item)
-        
-        # Improvement suggestions
-        st.markdown("---")
-        st.subheader("💡 Improvement Suggestions")
-        
-        if enhanced_score['breakdown']['contact'] < 15:
-            st.write("• Add missing contact information (email, phone)")
-        
-        if enhanced_score['breakdown']['skills'] < 15:
-            st.write("• Add more relevant skills in a dedicated skills section")
-        
-        if enhanced_score['breakdown']['experience'] < 15:
-            st.write("• Elaborate on work experience with specific achievements")
-        
-        if enhanced_score['breakdown']['education'] < 10:
-            st.write("• Ensure education section is clearly labeled and detailed")
-        
-        if enhanced_score['breakdown']['ats'] < 15:
-            st.write("• Use more action verbs and quantifiable achievements")
-    
     # Course Recommendations
     ds_keyword = ['tensorflow','keras','pytorch','machine learning','flask','streamlit']
     web_keyword = ['react','django','node js','php','laravel','javascript','angular js']
@@ -963,31 +686,17 @@ def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages,
 
     # VIDEO RECOMMENDATIONS
     try:
-        # Try to use videos from Courses.py
         video_recommender_with_thumbnails(resume_videos, "resume")
     except Exception as e:
         st.warning("Using fallback resume videos")
-        # Fallback video list
-        RESUME_VIDEOS = [
-            ("How to Write a WINNING Resume", "https://www.youtube.com/watch?v=XYZ123"),
-            ("Resume Tips for Tech Jobs", "https://www.youtube.com/watch?v=XYZ124"),
-            ("ATS Friendly Resume Guide", "https://www.youtube.com/watch?v=XYZ125")
-        ]
-        video_recommender_with_thumbnails(RESUME_VIDEOS, "resume_fallback")
+        video_recommender_with_thumbnails(resume_videos, "resume_fallback")
     
     try:
         st.subheader("**🎤 Interview Preparation Videos**")
-        # Try to use videos from Courses.py
         video_recommender_with_thumbnails(interview_videos, "interview")
     except Exception as e:
         st.warning("Using fallback interview videos")
-        # Fallback video list
-        INTERVIEW_VIDEOS = [
-            ("Top 10 Interview Questions and Answers", "https://www.youtube.com/watch?v=XYZ128"),
-            ("Technical Interview Preparation", "https://www.youtube.com/watch?v=XYZ129"),
-            ("Behavioral Interview Tips", "https://www.youtube.com/watch?v=XYZ130")
-        ]
-        video_recommender_with_thumbnails(INTERVIEW_VIDEOS, "interview_fallback")
+        video_recommender_with_thumbnails(interview_videos, "interview_fallback")
 
     recommended_skills = skills_list[:5] + ['Communication','Teamwork']
 
@@ -1000,51 +709,6 @@ def display_enhanced_results(resume_data, enhanced_score, raw_text, no_of_pages,
         st.success("✅ Your resume analysis has been saved successfully!")
     else:
         st.info("📊 Analysis completed! (Data not saved due to database issue)")
-
-def course_recommender(course_list, key_suffix=""):
-    st.subheader("**Courses & Certificates Recommendations 🎓**")
-    rec_course = []
-    no_of_reco = st.slider('Choose Number of Course Recommendations:', 1, 10, 5, key=f"course_slider_{key_suffix}")
-    copy_courses = course_list[:]
-    random.shuffle(copy_courses)
-    for idx, (c_name, c_link) in enumerate(copy_courses, start=1):
-        st.markdown(f"({idx}) [{c_name}]({c_link})")
-        rec_course.append(c_name)
-        if idx == no_of_reco:
-            break
-    return rec_course
-
-def video_recommender_with_thumbnails(video_list, key_suffix=""):
-    st.subheader("**🎥 Recommended Videos**")
-    rec_videos = []
-    no_of_reco = st.slider('Choose Number of Video Recommendations:', 1, 10, 4, key=f"video_slider_{key_suffix}")
-    copy_videos = video_list[:]
-    random.shuffle(copy_videos)
-    
-    for idx, video_item in enumerate(copy_videos, start=1):
-        try:
-            if isinstance(video_item, tuple) and len(video_item) == 2:
-                v_name, v_link = video_item
-            elif isinstance(video_item, str):
-                v_link = video_item
-                v_name = f"Video {idx}"
-            elif isinstance(video_item, dict):
-                v_name = video_item.get('name', video_item.get('title', 'Video'))
-                v_link = video_item.get('link', video_item.get('url', '#'))
-            else:
-                v_name = f"Video {idx}"
-                v_link = "#"
-            
-            # Simple display without thumbnails for stability
-            st.markdown(f"({idx}) [{v_name}]({v_link})")
-            
-            rec_videos.append(v_name)
-            if idx == no_of_reco:
-                break
-        except Exception as e:
-            st.warning(f"Could not process video: {str(e)}")
-            continue
-    return rec_videos
 
 def skills_improvement_recommendations(resume_skills, career_field):
     """Provide detailed skills improvement recommendations"""
@@ -1123,7 +787,7 @@ def skills_improvement_recommendations(resume_skills, career_field):
             st.write(f"📚 {skill}")
 
 # -----------------------------
-# Resume Builder Functions - FIXED
+# Resume Builder
 # -----------------------------
 def init_resume_builder_session():
     """Initialize resume builder session state"""
@@ -1137,6 +801,70 @@ def init_resume_builder_session():
             'projects': [],
             'certifications': []
         }
+
+def validate_date_format(date_str):
+    """Validate date format MM/YYYY"""
+    if date_str.lower() == 'present':
+        return True
+    try:
+        parts = date_str.split('/')
+        if len(parts) != 2:
+            return False
+        month, year = parts
+        month_num = int(month)
+        year_num = int(year)
+        
+        # Check if month is valid (1-12)
+        if month_num < 1 or month_num > 12:
+            return False
+            
+        # Check if year is reasonable (e.g., 1900-2100)
+        if year_num < 1900 or year_num > 2100:
+            return False
+            
+        return True
+    except ValueError:
+        return False
+
+def calculate_resume_completeness(resume_data):
+    """Calculate how complete the resume is"""
+    total_points = 0
+    earned_points = 0
+    
+    # Personal info (30 points)
+    total_points += 30
+    if resume_data['personal_info']['name']:
+        earned_points += 10
+    if resume_data['personal_info']['email']:
+        earned_points += 10
+    if resume_data['personal_info']['phone']:
+        earned_points += 5
+    if resume_data['personal_info']['linkedin']:
+        earned_points += 5
+    
+    # Summary (15 points)
+    total_points += 15
+    if resume_data['summary']:
+        earned_points += 15
+    
+    # Experience (25 points)
+    total_points += 25
+    if resume_data['experience']:
+        earned_points += 25
+    elif any([resume_data['personal_info']['name'], resume_data['personal_info']['email']]):
+        earned_points += 10  # Partial credit if basic info exists
+    
+    # Education (15 points)
+    total_points += 15
+    if resume_data['education']:
+        earned_points += 15
+    
+    # Skills (15 points)
+    total_points += 15
+    if resume_data['skills']:
+        earned_points += 15
+    
+    return int((earned_points / total_points) * 100) if total_points > 0 else 0
 
 def render_resume_builder():
     """Render the resume builder interface"""
@@ -1183,18 +911,16 @@ def render_resume_builder():
             height=100
         )
     
-    # Experience - FIXED DATE FORMAT AND ADD FUNCTIONALITY
+    # Experience
     with st.expander("💼 Work Experience"):
         st.subheader("Add Work Experience")
         
-        # Use a form key to ensure form resets properly
         with st.form("experience_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
                 company = st.text_input("Company*", key="exp_company")
                 position = st.text_input("Position*", key="exp_position")
             with col2:
-                # Fixed date format - use text input with better placeholder
                 start_date = st.text_input("Start Date* (MM/YYYY)", placeholder="01/2020", key="exp_start")
                 end_date = st.text_input("End Date (MM/YYYY) or 'Present'", placeholder="12/2023 or Present", key="exp_end")
             
@@ -1215,7 +941,7 @@ def render_resume_builder():
                 if not description:
                     errors.append("Description is required")
                 
-                # Date validation - FIXED
+                # Date validation
                 if start_date and start_date.lower() != 'present':
                     if not validate_date_format(start_date):
                         errors.append("Start date must be in MM/YYYY format (e.g., 01/2020)")
@@ -1223,17 +949,6 @@ def render_resume_builder():
                 if end_date and end_date.lower() != 'present':
                     if not validate_date_format(end_date) and end_date.lower() != 'present':
                         errors.append("End date must be in MM/YYYY format (e.g., 12/2023) or 'Present'")
-                
-                # Date logic validation
-                if (start_date and end_date and 
-                    start_date.lower() != 'present' and end_date.lower() != 'present' and
-                    validate_date_format(start_date) and validate_date_format(end_date)):
-                    
-                    start_month, start_year = map(int, start_date.split('/'))
-                    end_month, end_year = map(int, end_date.split('/'))
-                    
-                    if (end_year < start_year) or (end_year == start_year and end_month < start_month):
-                        errors.append("End date cannot be before start date")
                 
                 if errors:
                     for error in errors:
@@ -1248,7 +963,7 @@ def render_resume_builder():
                         'description': description
                     })
                     st.success("✅ Experience added successfully!")
-                    st.rerun()  # Force rerun to update the display
+                    st.rerun()
         
         # Display experiences
         if st.session_state.resume_data['experience']:
@@ -1267,7 +982,7 @@ def render_resume_builder():
         else:
             st.info("💡 Add your work experience to build a comprehensive resume")
     
-    # Education Section - FIXED DATE FORMAT
+    # Education Section
     with st.expander("🎓 Education"):
         st.subheader("Add Education")
         
@@ -1296,7 +1011,7 @@ def render_resume_builder():
                 if not ed_start_date:
                     errors.append("Start date is required")
                 
-                # Date validation - FIXED
+                # Date validation
                 if ed_start_date and ed_start_date.lower() != 'present':
                     if not validate_date_format(ed_start_date):
                         errors.append("Start date must be in MM/YYYY format (e.g., 08/2018)")
@@ -1304,17 +1019,6 @@ def render_resume_builder():
                 if ed_end_date and ed_end_date.lower() != 'present':
                     if not validate_date_format(ed_end_date) and ed_end_date.lower() != 'present':
                         errors.append("End date must be in MM/YYYY format (e.g., 05/2022) or 'Present'")
-                
-                # Date logic validation
-                if (ed_start_date and ed_end_date and 
-                    ed_start_date.lower() != 'present' and ed_end_date.lower() != 'present' and
-                    validate_date_format(ed_start_date) and validate_date_format(ed_end_date)):
-                    
-                    start_month, start_year = map(int, ed_start_date.split('/'))
-                    end_month, end_year = map(int, ed_end_date.split('/'))
-                    
-                    if (end_year < start_year) or (end_year == start_year and end_month < start_month):
-                        errors.append("End date cannot be before start date")
                 
                 if errors:
                     for error in errors:
@@ -1462,7 +1166,7 @@ def render_resume_builder():
     with st.expander("📋 Preview Resume Data"):
         st.json(st.session_state.resume_data)
     
-    # Export Options - FIXED PDF GENERATION
+    # Export Options
     st.subheader("📤 Export Your Resume")
     
     col1, col2, col3 = st.columns(3)
@@ -1511,79 +1215,13 @@ def render_resume_builder():
     st.subheader(f"📊 Resume Completeness: {completeness}%")
     st.progress(completeness / 100)
 
-# FIXED DATE VALIDATION FUNCTION
-def validate_date_format(date_str):
-    """Validate date format MM/YYYY"""
-    if date_str.lower() == 'present':
-        return True
-    try:
-        parts = date_str.split('/')
-        if len(parts) != 2:
-            return False
-        month, year = parts
-        month_num = int(month)
-        year_num = int(year)
-        
-        # Check if month is valid (1-12)
-        if month_num < 1 or month_num > 12:
-            return False
-            
-        # Check if year is reasonable (e.g., 1900-2100)
-        if year_num < 1900 or year_num > 2100:
-            return False
-            
-        return True
-    except ValueError:
-        return False
-
-def calculate_resume_completeness(resume_data):
-    """Calculate how complete the resume is"""
-    total_points = 0
-    earned_points = 0
-    
-    # Personal info (30 points)
-    total_points += 30
-    if resume_data['personal_info']['name']:
-        earned_points += 10
-    if resume_data['personal_info']['email']:
-        earned_points += 10
-    if resume_data['personal_info']['phone']:
-        earned_points += 5
-    if resume_data['personal_info']['linkedin']:
-        earned_points += 5
-    
-    # Summary (15 points)
-    total_points += 15
-    if resume_data['summary']:
-        earned_points += 15
-    
-    # Experience (25 points)
-    total_points += 25
-    if resume_data['experience']:
-        earned_points += 25
-    elif any([resume_data['personal_info']['name'], resume_data['personal_info']['email']]):
-        earned_points += 10  # Partial credit if basic info exists
-    
-    # Education (15 points)
-    total_points += 15
-    if resume_data['education']:
-        earned_points += 15
-    
-    # Skills (15 points)
-    total_points += 15
-    if resume_data['skills']:
-        earned_points += 15
-    
-    return int((earned_points / total_points) * 100) if total_points > 0 else 0
-
-# NEW: PDF GENERATION FUNCTION
 def generate_pdf_resume(resume_data):
     """Generate a PDF resume from the resume data"""
     try:
         from reportlab.lib.pagesizes import letter
         from reportlab.pdfgen import canvas
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
         from reportlab.lib.units import inch
         from reportlab.lib import colors
         import io
@@ -1819,10 +1457,504 @@ def create_fallback_pdf(resume_data):
     return pdf_content
 
 # -----------------------------
-# Other Sections (Admin, Cover Letter, etc.)
+# Cover Letter Generator
+# -----------------------------
+def cover_letter_generator():
+    """Cover Letter Generator Interface"""
+    st.header("📝 AI Cover Letter Generator")
+    
+    with st.form("cover_letter_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            applicant_name = st.text_input("Your Full Name*", placeholder="John Doe")
+            applicant_email = st.text_input("Your Email*", placeholder="john.doe@email.com")
+            applicant_phone = st.text_input("Your Phone", placeholder="+1 (555) 123-4567")
+            job_title = st.text_input("Job Title you're applying for*", placeholder="Software Engineer")
+            
+        with col2:
+            company = st.text_input("Company Name*", placeholder="Tech Innovations Inc.")
+            hiring_manager = st.text_input("Hiring Manager Name (optional)", placeholder="Jane Smith")
+            company_address = st.text_input("Company Address (optional)", placeholder="123 Business Ave, City, State")
+            industry = st.selectbox("Industry", ["Technology", "Healthcare", "Finance", "Education", "Manufacturing", "Other"])
+        
+        st.subheader("Your Professional Background")
+        key_skills = st.text_input("Key Skills*", placeholder="Python, Machine Learning, Data Analysis, Team Leadership")
+        years_experience = st.number_input("Years of Experience", min_value=0, max_value=50, value=3)
+        current_role = st.text_input("Current/Most Recent Role", placeholder="Senior Developer")
+        
+        st.subheader("Your Achievements")
+        achievement_1 = st.text_area("Key Achievement 1*", placeholder="Led a team of 5 developers to deliver a project that increased company revenue by 20%...")
+        achievement_2 = st.text_area("Key Achievement 2", placeholder="Optimized database queries reducing response time by 40%...")
+        
+        st.subheader("Company Specific Details")
+        company_interest = st.text_area("Why you're interested in this company*", placeholder="I'm particularly drawn to Tech Innovations Inc. because of your innovative approach to...")
+        company_field = st.text_input("Company's Field/Industry*", placeholder="Software development and AI solutions")
+        matching_skills = st.text_input("Skills that match the job requirements*", placeholder="My experience in Python and team leadership aligns perfectly with your requirements for...")
+        
+        if st.form_submit_button("✨ Generate Cover Letter"):
+            if applicant_name and job_title and company and key_skills and achievement_1 and company_interest:
+                template_data = {
+                    'date': datetime.datetime.now().strftime("%B %d, %Y"),
+                    'applicant_name': applicant_name,
+                    'applicant_contact': f"{applicant_email} | {applicant_phone}" if applicant_phone else applicant_email,
+                    'hiring_manager': hiring_manager or "Hiring Manager",
+                    'company': company,
+                    'company_address': company_address or "",
+                    'job_title': job_title,
+                    'industry': industry,
+                    'key_skills': key_skills,
+                    'years_experience': years_experience,
+                    'current_role': current_role,
+                    'achievement_1': achievement_1,
+                    'achievement_2': achievement_2,
+                    'company_interest': company_interest,
+                    'company_field': company_field,
+                    'matching_skills': matching_skills,
+                }
+                
+                cover_letter = generate_cover_letter_text(template_data)
+                
+                st.subheader("✨ Generated Cover Letter")
+                st.text_area("Your Professional Cover Letter", cover_letter, height=400)
+                
+                # Download option
+                b64 = base64.b64encode(cover_letter.encode()).decode()
+                href = f'<a href="data:file/txt;base64,{b64}" download="cover_letter_{company}_{job_title}.txt">📥 Download Cover Letter</a>'
+                st.markdown(href, unsafe_allow_html=True)
+                
+                st.success("✅ Cover letter generated successfully! Remember to personalize it further before sending.")
+            else:
+                st.error("❌ Please fill in all required fields (marked with *)")
+
+def generate_cover_letter_text(template_data):
+    """Generate cover letter text from template data"""
+    return f"""
+{template_data['date']}
+
+{template_data['hiring_manager']}
+{template_data['company']}
+{template_data['company_address']}
+
+Dear {template_data['hiring_manager'].split()[0] if template_data['hiring_manager'] else 'Hiring Manager'},
+
+I am writing to express my enthusiastic interest in the {template_data['job_title']} position at {template_data['company']}, as advertised on your company website. With {template_data['years_experience']} years of experience in {template_data['industry']} and expertise in {template_data['key_skills']}, I am confident that I possess the skills and experience necessary to excel in this role.
+
+As a {template_data['current_role'] or 'professional'}, I have consistently demonstrated my ability to deliver exceptional results. For instance:
+{template_data['achievement_1']}
+
+{template_data['achievement_2'] if template_data['achievement_2'] else ''}
+
+What particularly excites me about the opportunity at {template_data['company']} is {template_data['company_interest']}. I admire your company's work in {template_data['company_field']} and believe my skills in {template_data['matching_skills']} align perfectly with your requirements.
+
+I am eager to bring my unique blend of skills and experience to {template_data['company']} and contribute to your ongoing success. I am confident that my background in {template_data['key_skills']} would make me a valuable asset to your team.
+
+Thank you for considering my application. I have attached my resume for your review and would welcome the opportunity to discuss how my skills and experiences can contribute to the success of {template_data['company']}. I look forward to the possibility of speaking with you soon.
+
+Sincerely,
+{template_data['applicant_name']}
+{template_data['applicant_contact']}
+"""
+
+# -----------------------------
+# Resume Templates
+# -----------------------------
+def resume_templates():
+    """Resume Templates Gallery"""
+    st.header("🎨 Professional Resume Templates")
+    
+    st.markdown("""
+    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); margin: 10px 0; color: white;">
+        <h3>Choose from our professionally designed resume templates</h3>
+        <p>Each template is ATS-friendly and optimized for different industries and experience levels</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Template Gallery
+    cols = st.columns(2)
+    
+    with cols[0]:
+        # Professional Template
+        st.subheader("💼 Professional")
+        st.markdown("""
+        **Ideal for:** Corporate roles, Business, Finance, Management
+        **Features:**
+        - Clean, traditional layout
+        - ATS optimized
+        - Professional typography
+        - Balanced sections
+        """)
+        if st.button("Use Professional Template", key="professional_btn", use_container_width=True):
+            st.session_state.selected_template = "professional"
+            st.success("✅ Professional template selected! Navigate to Resume Builder to start building.")
+        
+        # Modern Template
+        st.subheader("🚀 Modern")
+        st.markdown("""
+        **Ideal for:** Tech roles, Startups, Creative industries
+        **Features:**
+        - Contemporary design
+        - Color accents
+        - Skills visualization
+        - Modern typography
+        """)
+        if st.button("Use Modern Template", key="modern_btn", use_container_width=True):
+            st.session_state.selected_template = "modern"
+            st.success("✅ Modern template selected! Navigate to Resume Builder to start building.")
+
+    with cols[1]:
+        # Creative Template
+        st.subheader("🎨 Creative")
+        st.markdown("""
+        **Ideal for:** Designers, Artists, Marketing, UX/UI
+        **Features:**
+        - Visual appeal
+        - Portfolio integration
+        - Creative layouts
+        - Color customization
+        """)
+        if st.button("Use Creative Template", key="creative_btn", use_container_width=True):
+            st.session_state.selected_template = "creative"
+            st.success("✅ Creative template selected! Navigate to Resume Builder to start building.")
+        
+        # Minimal Template
+        st.subheader("📄 Minimal")
+        st.markdown("""
+        **Ideal for:** Academic roles, Research, Conservative industries
+        **Features:**
+        - Simple and clean
+        - Maximum readability
+        - Focus on content
+        - One-page optimized
+        """)
+        if st.button("Use Minimal Template", key="minimal_btn", use_container_width=True):
+            st.session_state.selected_template = "minimal"
+            st.success("✅ Minimal template selected! Navigate to Resume Builder to start building.")
+    
+    # Template Preview Section
+    st.markdown("---")
+    st.subheader("📋 Template Features Comparison")
+    
+    feature_data = {
+        'Feature': ['ATS Optimization', 'Modern Design', 'Color Options', 'Skills Chart', 'Portfolio Section', 'Mobile Friendly'],
+        'Professional': ['✅', '✅', '🔵⚫', '✅', '❌', '✅'],
+        'Modern': ['✅', '✅', '🔵🟣🟢', '✅', '✅', '✅'],
+        'Creative': ['✅', '✅', 'Full Palette', '✅', '✅', '✅'],
+        'Minimal': ['✅', '❌', '⚫⚪', '❌', '❌', '✅']
+    }
+    
+    feature_df = pd.DataFrame(feature_data)
+    st.dataframe(feature_df, use_container_width=True, hide_index=True)
+    
+    # Usage Tips
+    st.markdown("---")
+    st.subheader("💡 Template Selection Tips")
+    
+    tips_col1, tips_col2 = st.columns(2)
+    
+    with tips_col1:
+        st.markdown("""
+        **Choose Professional if:**
+        - Applying to corporate companies
+        - In finance/business roles
+        - Prefer traditional format
+        - Want maximum ATS compatibility
+        """)
+        
+        st.markdown("""
+        **Choose Modern if:**
+        - In tech industry
+        - Applying to startups
+        - Want contemporary look
+        - Have projects to showcase
+        """)
+    
+    with tips_col2:
+        st.markdown("""
+        **Choose Creative if:**
+        - Designer/artist role
+        - Marketing position
+        - Want visual impact
+        - Have portfolio items
+        """)
+        
+        st.markdown("""
+        **Choose Minimal if:**
+        - Academic applications
+        - Research positions
+        - Conservative industries
+        - Need one-page resume
+        """)
+
+# -----------------------------
+# Interview Question Generator
+# -----------------------------
+def interview_question_generator():
+    """Generate personalized interview questions"""
+    st.header("🎤 AI Interview Question Generator")
+    
+    with st.form("interview_questions_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            job_role = st.text_input("Target Job Role*", placeholder="e.g., Data Scientist, Frontend Developer")
+            experience_level = st.selectbox("Experience Level*", ["Entry Level (0-2 years)", "Mid Level (3-5 years)", "Senior Level (6+ years)", "Executive"])
+            industry = st.selectbox("Industry*", ["Technology", "Finance", "Healthcare", "Education", "Manufacturing", "Startup", "Other"])
+        
+        with col2:
+            question_types = st.multiselect("Question Types*", 
+                                          ["Technical Skills", "Behavioral", "Situational", "Leadership", "Cultural Fit", "Problem Solving"],
+                                          default=["Technical Skills", "Behavioral"])
+            num_questions = st.slider("Number of Questions", 5, 25, 15)
+            difficulty = st.select_slider("Difficulty Level", options=["Easy", "Medium", "Hard", "Mixed"])
+        
+        # Use text input for skills instead of custom_tags_input
+        skills_input = st.text_input("Your Key Skills* (comma separated)", 
+                                   placeholder="e.g., Python, JavaScript, React, AWS, SQL")
+        
+        specific_technologies = st.text_input("Specific Technologies/Tools", placeholder="e.g., React, TensorFlow, AWS, Docker")
+        
+        submitted = st.form_submit_button("🎯 Generate Interview Questions")
+        
+        if submitted:
+            # Process skills from text input
+            skills = [skill.strip() for skill in skills_input.split(',')] if skills_input else []
+            
+            # Validation
+            missing_fields = []
+            if not job_role:
+                missing_fields.append("Job Role")
+            if not skills_input:
+                missing_fields.append("Key Skills")
+            if not question_types:
+                missing_fields.append("Question Types")
+            
+            if missing_fields:
+                st.error(f"❌ Please fill in all required fields: {', '.join(missing_fields)}")
+            else:
+                questions = generate_personalized_questions(job_role, experience_level, skills, question_types, difficulty, specific_technologies, num_questions)
+                display_questions(questions, job_role, experience_level)
+
+def generate_personalized_questions(job_role, experience_level, skills, question_types, difficulty, specific_technologies, num_questions):
+    """Generate personalized interview questions based on inputs"""
+    questions = []
+    
+    # Technical questions based on skills
+    if "Technical Skills" in question_types and skills:
+        tech_questions = [
+            f"Explain your experience with {skill} and provide an example of how you've used it in a project"
+            for skill in skills[:4]  # Top 4 skills
+        ]
+        questions.extend([{'type': 'Technical', 'question': q, 'difficulty': 'Medium'} for q in tech_questions])
+    
+    # Technology-specific questions
+    if specific_technologies:
+        tech_list = [tech.strip() for tech in specific_technologies.split(',')]
+        for tech in tech_list[:3]:
+            questions.append({
+                'type': 'Technical',
+                'question': f"What challenges have you faced while working with {tech} and how did you overcome them?",
+                'difficulty': 'Hard'
+            })
+    
+    # Behavioral questions
+    if "Behavioral" in question_types:
+        behavioral_questions = [
+            f"Tell me about a time you faced a significant challenge in your role as {job_role} and how you handled it",
+            f"Describe a situation where you had to work with a difficult team member. What was the outcome?",
+            "How do you handle tight deadlines and competing priorities?",
+            "Tell me about a time you made a mistake at work. What did you learn from it?",
+            "Describe your proudest professional achievement and why it matters to you"
+        ]
+        questions.extend([{'type': 'Behavioral', 'question': q, 'difficulty': 'Medium'} for q in behavioral_questions])
+    
+    # Leadership questions for senior roles
+    if "Leadership" in question_types and any(level in experience_level for level in ['Senior', 'Executive']):
+        leadership_questions = [
+            "How do you approach mentoring junior team members?",
+            "Describe your experience leading a team through a difficult project",
+            "How do you handle conflict within your team?",
+            "What's your strategy for delegating tasks effectively?"
+        ]
+        questions.extend([{'type': 'Leadership', 'question': q, 'difficulty': 'Hard'} for q in leadership_questions])
+    
+    # Problem-solving questions
+    if "Problem Solving" in question_types:
+        problem_questions = [
+            "Describe your process for troubleshooting a complex technical issue",
+            "How do you approach learning new technologies or skills?",
+            "Tell me about a time you had to think creatively to solve a problem",
+            "What's your strategy for breaking down large, complex problems?"
+        ]
+        questions.extend([{'type': 'Problem Solving', 'question': q, 'difficulty': 'Medium'} for q in problem_questions])
+    
+    # Cultural fit questions
+    if "Cultural Fit" in question_types:
+        cultural_questions = [
+            "What type of work environment do you thrive in?",
+            "How do you handle feedback and criticism?",
+            "What motivates you to do your best work?",
+            "Describe your ideal company culture"
+        ]
+        questions.extend([{'type': 'Cultural Fit', 'question': q, 'difficulty': 'Easy'} for q in cultural_questions])
+    
+    # Situational questions
+    if "Situational" in question_types:
+        situational_questions = [
+            "What would you do if you disagreed with your manager's technical decision?",
+            "How would you handle a situation where a project deadline was moved up unexpectedly?",
+            "What would you do if you discovered a critical bug in production?",
+            "How would you approach a situation where you had to learn a new technology quickly?"
+        ]
+        questions.extend([{'type': 'Situational', 'question': q, 'difficulty': 'Medium'} for q in situational_questions])
+    
+    # Fill remaining slots with role-specific questions
+    role_specific_questions = {
+        'Data Scientist': [
+            "How do you validate your machine learning models?",
+            "Explain the bias-variance tradeoff",
+            "How do you handle missing data in your datasets?",
+            "What metrics do you use to evaluate model performance?"
+        ],
+        'Web Developer': [
+            "Explain your approach to responsive design",
+            "How do you optimize website performance?",
+            "Describe your experience with version control systems",
+            "What's your process for testing your code?"
+        ],
+        'Software Engineer': [
+            "Explain your software development methodology",
+            "How do you approach code reviews?",
+            "Describe your experience with testing methodologies",
+            "What considerations do you make for security in your applications?"
+        ],
+        'Frontend Developer': [
+            "How do you ensure cross-browser compatibility?",
+            "What's your experience with modern JavaScript frameworks?",
+            "How do you optimize frontend performance?",
+            "Describe your approach to accessibility"
+        ],
+        'Backend Developer': [
+            "How do you design scalable APIs?",
+            "What's your experience with database optimization?",
+            "How do you handle authentication and authorization?",
+            "Describe your approach to API security"
+        ],
+        'Mobile Developer': [
+            "What's your experience with native vs cross-platform development?",
+            "How do you optimize mobile app performance?",
+            "Describe your approach to mobile UI/UX",
+            "How do you handle different screen sizes and orientations?"
+        ]
+    }
+    
+    for role, role_qs in role_specific_questions.items():
+        if role.lower() in job_role.lower():
+            questions.extend([{'type': 'Role-Specific', 'question': q, 'difficulty': 'Hard'} for q in role_qs])
+            break
+    
+    # Apply difficulty filter
+    if difficulty != "Mixed":
+        questions = [q for q in questions if q['difficulty'] == difficulty]
+    
+    # Shuffle and limit to requested number
+    random.shuffle(questions)
+    return questions[:num_questions]
+
+def display_questions(questions, job_role, experience_level):
+    """Display generated questions in an organized way"""
+    st.subheader(f"🎯 Personalized Interview Questions for {experience_level} {job_role}")
+    st.success(f"Generated {len(questions)} questions tailored to your profile")
+    
+    # Categorize questions by type
+    question_categories = {}
+    for q in questions:
+        if q['type'] not in question_categories:
+            question_categories[q['type']] = []
+        question_categories[q['type']].append(q)
+    
+    # Display by category
+    for category, category_questions in question_categories.items():
+        with st.expander(f"{category} Questions ({len(category_questions)})", expanded=True):
+            for i, q in enumerate(category_questions, 1):
+                st.markdown(f"**Q{i}:** {q['question']}")
+                
+                # Difficulty indicator
+                difficulty_color = {
+                    'Easy': '🟢',
+                    'Medium': '🟡', 
+                    'Hard': '🔴'
+                }
+                st.caption(f"Difficulty: {difficulty_color.get(q['difficulty'], '⚪')} {q['difficulty']}")
+                
+                # Answer practice area
+                with st.expander("💬 Practice Your Answer", expanded=False):
+                    st.text_area(
+                        f"Type your answer here...", 
+                        key=f"answer_{category}_{i}_{random.randint(1000,9999)}",
+                        height=100,
+                        placeholder="Structure your answer using the STAR method:\n- Situation: Set the context\n- Task: What needed to be done\n- Action: What you specifically did\n- Result: The outcome and what you learned"
+                    )
+                
+                st.markdown("---")
+    
+    # Interview Tips Section
+    st.markdown("---")
+    st.subheader("💡 Expert Interview Preparation Tips")
+    
+    tips_col1, tips_col2 = st.columns(2)
+    
+    with tips_col1:
+        st.markdown("""
+        **🎯 Preparation Strategy:**
+        - Research the company thoroughly
+        - Practice answers aloud, not just in your head
+        - Prepare 3-5 questions to ask the interviewer
+        - Review the job description and match your skills
+        """)
+        
+        st.markdown("""
+        **💪 Technical Interviews:**
+        - Practice coding on a whiteboard or paper
+        - Explain your thought process clearly
+        - Don't be afraid to ask clarifying questions
+        - Test your solutions with examples
+        """)
+    
+    with tips_col2:
+        st.markdown("""
+        **🌟 Behavioral Questions:**
+        - Use the STAR method consistently
+        - Focus on your specific contributions
+        - Quantify results when possible
+        - Be honest about challenges and learning
+        """)
+        
+        st.markdown("""
+        **🤝 Final Tips:**
+        - Arrive 10-15 minutes early
+        - Dress appropriately for the company culture
+        - Maintain positive body language
+        - Send thank you notes within 24 hours
+        """)
+    
+    # Download questions as text
+    questions_text = f"Interview Questions for {experience_level} {job_role}\n\n"
+    for category, category_questions in question_categories.items():
+        questions_text += f"{category}:\n"
+        for i, q in enumerate(category_questions, 1):
+            questions_text += f"{i}. {q['question']} ({q['difficulty']})\n"
+        questions_text += "\n"
+    
+    b64 = base64.b64encode(questions_text.encode()).decode()
+    href = f'<a href="data:file/txt;base64,{b64}" download="interview_questions_{job_role.replace(" ", "_")}.txt">📥 Download Questions as Text</a>'
+    st.markdown(href, unsafe_allow_html=True)
+
+# -----------------------------
+# Admin Section
 # -----------------------------
 def run_admin_section():
-    """Admin Section"""
+    """Admin Dashboard"""
     st.subheader("👨‍💼 Admin Dashboard")
     st.success('Welcome to Admin Side')
     
@@ -1830,32 +1962,33 @@ def run_admin_section():
     ad_password = st.text_input("Password", type='password', key="admin_pass")
     
     if st.button('Login', key="admin_login"):
-        if ad_user == 'arpitsharma' and ad_password == 'sharma123':
-            st.success("Welcome Arpit!")
-            display_enhanced_admin_analytics()
+        if ad_user == 'admin' and ad_password == 'admin123':
+            st.success("Welcome Admin!")
+            display_admin_analytics()
         else:
             st.error("Wrong ID & Password Provided")
 
-def display_enhanced_admin_analytics():
-    """Display enhanced admin analytics"""
+def display_admin_analytics():
+    """Display admin analytics"""
     if not connection:
         st.error("❌ Database not available")
         return
         
+    # Enhanced Metrics
     st.markdown("### 📊 Advanced Analytics Dashboard")
     
     admin_col1, admin_col2, admin_col3, admin_col4 = st.columns(4)
     
     with admin_col1:
         try:
-            total_users = pd.read_sql(f"SELECT COUNT(*) as count FROM {TABLE_NAME}", connection).iloc[0]['count']
+            total_users = pd.read_sql("SELECT COUNT(*) as count FROM user_data", connection).iloc[0]['count']
             st.metric("Total Users", total_users)
         except:
             st.metric("Total Users", 0)
     
     with admin_col2:
         try:
-            avg_score_result = pd.read_sql(f"SELECT AVG(CAST(resume_score as NUMERIC)) as avg_score FROM {TABLE_NAME}", connection)
+            avg_score_result = pd.read_sql("SELECT AVG(CAST(resume_score as NUMERIC)) as avg_score FROM user_data", connection)
             avg_score = avg_score_result.iloc[0]['avg_score']
             st.metric("Average Resume Score", f"{avg_score:.1f}" if avg_score is not None else "0")
         except:
@@ -1863,37 +1996,108 @@ def display_enhanced_admin_analytics():
     
     with admin_col3:
         try:
-            exp_levels = pd.read_sql(f"SELECT COUNT(*) as exp_count FROM {TABLE_NAME} WHERE User_level = 'Experienced'", connection).iloc[0]['exp_count']
+            exp_levels = pd.read_sql("SELECT COUNT(*) as exp_count FROM user_data WHERE User_level = 'Experienced'", connection).iloc[0]['exp_count']
             st.metric("Experienced Users", exp_levels)
         except:
             st.metric("Experienced Users", 0)
     
     with admin_col4:
         try:
-            recent_users = pd.read_sql(f"SELECT COUNT(*) as count FROM {TABLE_NAME} WHERE date(Timestamp) >= date('now', '-7 days')", connection).iloc[0]['count']
+            recent_users = pd.read_sql("SELECT COUNT(*) as count FROM user_data WHERE date(Timestamp) >= date('now', '-7 days')", connection).iloc[0]['count']
             st.metric("New Users (7 days)", recent_users)
         except:
             st.metric("Recent Users", "N/A")
 
-def cover_letter_generator():
-    """Cover Letter Generator"""
-    st.header("📝 AI Cover Letter Generator")
-    st.info("Cover letter generator feature coming soon!")
+    # Enhanced Visualizations
+    try:
+        query = 'SELECT * FROM user_data;'
+        plot_data = pd.read_sql(query, connection)
+        
+        if not plot_data.empty:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Field Distribution")
+                if 'Predicted_Field' in plot_data.columns:
+                    field_counts = plot_data['Predicted_Field'].astype(str).value_counts()
+                    if not field_counts.empty:
+                        fig = px.pie(values=field_counts.values, names=field_counts.index, 
+                                   title='Career Field Distribution')
+                        st.plotly_chart(fig)
+                    else:
+                        st.info("No field data available for visualization")
+            
+            with col2:
+                st.subheader("Experience Level")
+                if 'User_level' in plot_data.columns:
+                    level_counts = plot_data['User_level'].astype(str).value_counts()
+                    if not level_counts.empty:
+                        fig = px.bar(x=level_counts.index, y=level_counts.values,
+                                   title='User Experience Levels', color=level_counts.index)
+                        st.plotly_chart(fig)
+                    else:
+                        st.info("No experience level data available")
 
-def resume_templates():
-    """Resume Templates"""
-    st.header("🎨 Professional Resume Templates")
-    st.info("Resume templates gallery coming soon!")
+            # Score Distribution
+            st.subheader("Resume Score Distribution")
+            if 'resume_score' in plot_data.columns:
+                try:
+                    scores = pd.to_numeric(plot_data['resume_score'], errors='coerce').dropna()
+                    if not scores.empty:
+                        fig = px.histogram(scores, nbins=20, title='Resume Score Distribution',
+                                         labels={'value': 'Score', 'count': 'Number of Users'})
+                        st.plotly_chart(fig)
+                    else:
+                        st.info("No score data available for visualization")
+                except Exception as e:
+                    st.info("Could not generate score distribution chart")
+    except Exception as e:
+        st.error(f"Error loading analytics: {str(e)}")
 
-def interview_question_generator():
-    """Interview Question Generator"""
-    st.header("🎤 AI Interview Question Generator")
-    st.info("Interview question generator feature coming soon!")
+    # Data Export
+    try:
+        cursor = connection.cursor()
+        cursor.execute('SELECT * FROM user_data')
+        data = cursor.fetchall()
+        
+        # Get column names
+        if connection:
+            try:
+                # For SQLite
+                cursor.execute("PRAGMA table_info(user_data)")
+                columns = [column[1] for column in cursor.fetchall()]
+            except:
+                # Fallback column names
+                columns = ['ID', 'Name', 'Email_ID', 'resume_score', 'Timestamp', 'Page_no', 
+                          'Predicted_Field', 'User_level', 'Actual_skills', 'Recommended_skills', 'Recommended_courses']
+        
+        df = pd.DataFrame(data, columns=columns)
+        
+        st.subheader("User Data")
+        st.dataframe(df)
+        
+        st.markdown(get_table_download_link(df, 'User_Data.csv', '📥 Download CSV Report'), unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"Error exporting data: {str(e)}")
 
+# -----------------------------
+# Career Analytics (Placeholder)
+# -----------------------------
 def run_career_analytics():
-    """Career Analytics"""
+    """Career Analytics Dashboard"""
     st.header("📈 Career Analytics Dashboard")
-    st.info("Career analytics feature coming soon!")
+    st.info("This feature is under development and will be available soon!")
+    
+    # Placeholder content
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Market Trends")
+        st.write("Coming soon: Real-time market demand analysis")
+        
+    with col2:
+        st.subheader("Salary Insights")
+        st.write("Coming soon: Industry salary benchmarks")
 
 # -----------------------------
 # Theme and Mobile Optimization
@@ -1998,10 +2202,12 @@ def run():
     choice = st.sidebar.selectbox("Navigate to:", activities)
     
     st.sidebar.markdown(
-        '<div style="margin-top: 50px; padding: 15px; background-color: rgba(255,255,255,0.1); border-radius: 8px;">'
-        '<p style="margin: 0; font-size: 14px; color: inherit;">© Developed by Arpit Sharma</p>'
-        '<a href="https://www.linkedin.com/in/arpit-sharma-11b65b211/" style="color: inherit !important; font-size: 14px;">LinkedIn Profile</a>'
-        '</div>', 
+        '''
+        <div style="margin-top: 50px; padding: 15px; background-color: rgba(255,255,255,0.1); border-radius: 8px;">
+        <p style="margin: 0; font-size: 14px; color: inherit;">© Developed by Arpit Sharma</p>
+        <a href="https://www.linkedin.com/in/arpit-sharma-11b65b211/" style="color: inherit !important; font-size: 14px;">LinkedIn Profile</a>
+        </div>
+        ''', 
         unsafe_allow_html=True
     )
 
