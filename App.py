@@ -1,10 +1,10 @@
-# FORCE NLTK DOWNLOAD BEFORE ANY IMPORTS - FIX FOR DEPLOYMENT
+# FORCE NLTK DOWNLOAD BEFORE ANY IMPORTS - FIX FOR STREAMLIT CLOUD
 import nltk
 import os
-import sys
+import tempfile
 
-# Set NLTK data path before any imports that might use NLTK
-nltk_data_path = '/home/adminuser/venv/nltk_data'
+# Use temp directory for NLTK data in Streamlit Cloud (writable location)
+nltk_data_path = os.path.join(tempfile.gettempdir(), 'nltk_data')
 os.makedirs(nltk_data_path, exist_ok=True)
 
 # Add to NLTK path and set environment variable
@@ -13,46 +13,27 @@ os.environ['NLTK_DATA'] = nltk_data_path
 
 # Download required NLTK data with error handling
 try:
-    # Check if data already exists
-    try:
-        nltk.data.find('corpora/stopwords')
-        print("✅ NLTK stopwords already available")
-    except LookupError:
-        print("📥 Downloading NLTK stopwords...")
-        nltk.download('stopwords', download_dir=nltk_data_path, quiet=True)
+    # Check and download required NLTK datasets
+    required_packages = ['stopwords', 'punkt', 'averaged_perceptron_tagger', 'wordnet']
     
-    try:
-        nltk.data.find('tokenizers/punkt')
-        print("✅ NLTK punkt already available")
-    except LookupError:
-        print("📥 Downloading NLTK punkt...")
-        nltk.download('punkt', download_dir=nltk_data_path, quiet=True)
-        
-    try:
-        nltk.data.find('taggers/averaged_perceptron_tagger')
-        print("✅ NLTK averaged_perceptron_tagger already available")
-    except LookupError:
-        print("📥 Downloading NLTK averaged_perceptron_tagger...")
-        nltk.download('averaged_perceptron_tagger', download_dir=nltk_data_path, quiet=True)
-        
+    for package in required_packages:
+        try:
+            nltk.data.find(f'corpora/{package}' if package == 'stopwords' else f'tokenizers/{package}' if package == 'punkt' else f'taggers/{package}' if package == 'averaged_perceptron_tagger' else f'corpora/{package}')
+            print(f"✅ NLTK {package} already available")
+        except LookupError:
+            print(f"📥 Downloading NLTK {package}...")
+            nltk.download(package, download_dir=nltk_data_path, quiet=True)
+    
     print("✅ All NLTK data ready")
     
 except Exception as e:
-    print(f"⚠️ NLTK download warning: {e}")
-    # Try alternative download method
-    try:
-        nltk.download('stopwords', quiet=True)
-        nltk.download('punkt', quiet=True)
-        nltk.download('averaged_perceptron_tagger', quiet=True)
-        print("✅ NLTK data downloaded via alternative method")
-    except Exception as e2:
-        print(f"❌ NLTK download failed: {e2}")
+    print(f"⚠️ NLTK initialization warning: {e}")
 
 # Now import other packages
 import streamlit as st
 import pandas as pd
 import base64
-# ... rest of your imports
+import random
 import time
 import datetime
 import io
@@ -67,7 +48,35 @@ from pdfminer.converter import TextConverter
 # OCR features disabled for deployment
 OCR_AVAILABLE = False
 
-from pyresparser import ResumeParser
+# IMPORTANT: Set NLTK data path again before importing pyresparser
+nltk.data.path.append(nltk_data_path)
+
+try:
+    from pyresparser import ResumeParser
+except Exception as e:
+    st.error(f"Resume parser loading issue: {e}")
+    # Create a mock ResumeParser for fallback
+    class MockResumeParser:
+        def __init__(self, file_path):
+            self.file_path = file_path
+            
+        def get_extracted_data(self):
+            return {
+                'name': '',
+                'email': '',
+                'mobile_number': '',
+                'skills': [],
+                'education': [],
+                'experience': [],
+                'company_names': [],
+                'college_name': '',
+                'designation': '',
+                'total_experience': 0
+            }
+    
+    ResumeParser = MockResumeParser
+    print("⚠️ Using fallback resume parser")
+
 from streamlit_tags import st_tags
 from PIL import Image
 import sqlite3  # Using SQLite for deployment
@@ -93,7 +102,6 @@ from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-
 # -----------------------------
 # Enhanced Configuration
 # -----------------------------
@@ -1709,4 +1717,5 @@ def run():
 
 if __name__ == "__main__":
     run()
+
 
